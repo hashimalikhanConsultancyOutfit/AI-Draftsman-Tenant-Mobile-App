@@ -74,8 +74,8 @@ export function DashboardScreen() {
   }, [dashboardQuery, statsQuery]);
 
   const allQuickActions: QuickAction[] = [
-    { label: 'Register customer', icon: 'person-add-alt', permission: CUSTOMER_PERMISSIONS.CREATE, onPress: () => goToDrawer(navigation, 'Customers') },
-    { label: 'Create agent', icon: 'add-circle-outline', permission: AGENT_PERMISSIONS.BUILD, onPress: () => goToTab(navigation, 'CompanyAgentsTab') },
+    { label: 'Register customer', icon: 'person-add-alt', permission: CUSTOMER_PERMISSIONS.CREATE, onPress: () => navigation.navigate('CustomerForm', {}) },
+    { label: 'Create agent', icon: 'add-circle-outline', permission: AGENT_PERMISSIONS.BUILD, onPress: () => navigation.navigate('AgentForm', {}) },
     { label: 'Issue API key', icon: 'vpn-key', permission: KEY_PERMISSIONS.CREATE, onPress: () => goToDrawer(navigation, 'ApiKeys') },
     { label: 'Edit limits', icon: 'tune', permission: BILLING_PERMISSIONS.MANAGE, onPress: () => goToTab(navigation, 'SettingsTab') },
   ];
@@ -117,19 +117,6 @@ export function DashboardScreen() {
             Activity, spend and recent runs across every agent and customer.
           </Text>
 
-          <TouchableOpacity
-            onPress={() => setMonthPickerOpen(true)}
-            style={[styles.monthPill, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.full }]}
-            accessibilityRole="button"
-            accessibilityLabel={`Month: ${monthLabel}. Tap to change.`}
-          >
-            <Icon name="event" size={15} color={theme.colors.accent} />
-            <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.body.semibold, fontSize: theme.fontSizes.sm }}>
-              {monthLabel}
-            </Text>
-            <Icon name="expand-more" size={18} color={theme.colors.textMuted} />
-          </TouchableOpacity>
-
           {quickActions.length > 0 && (
             <View style={styles.actionsRow}>
               {quickActions.map((a) => (
@@ -149,6 +136,19 @@ export function DashboardScreen() {
             </View>
           )}
 
+          <TouchableOpacity
+            onPress={() => setMonthPickerOpen(true)}
+            style={[styles.monthPill, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.full }]}
+            accessibilityRole="button"
+            accessibilityLabel={`Month: ${monthLabel}. Tap to change.`}
+          >
+            <Icon name="event" size={15} color={theme.colors.accent} />
+            <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.body.semibold, fontSize: theme.fontSizes.sm }}>
+              {monthLabel}
+            </Text>
+            <Icon name="expand-more" size={18} color={theme.colors.textMuted} />
+          </TouchableOpacity>
+
           {statsQuery.data?.registered === 0 ? (
             <Card>
               <EmptyState
@@ -160,7 +160,7 @@ export function DashboardScreen() {
                     : 'Setting the first customer up needs a permission you do not hold. Ask an owner or an admin.'
                 }
                 actionLabel={canCreateCustomer ? 'Register a customer' : undefined}
-                onAction={canCreateCustomer ? () => goToDrawer(navigation, 'Customers') : undefined}
+                onAction={canCreateCustomer ? () => navigation.navigate('CustomerForm', {}) : undefined}
               />
             </Card>
           ) : (
@@ -232,19 +232,59 @@ export function DashboardScreen() {
                 empty={!dashboardQuery.data?.topCustomersBySpend.length}
                 emptyLabel="No customer spend yet"
               >
-                {dashboardQuery.data?.topCustomersBySpend.slice(0, 5).map((c) => (
-                  <View key={c.id} style={[styles.spendRow, { borderBottomColor: theme.colors.border }]}>
-                    <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.body.medium, fontSize: theme.fontSizes.sm, flex: 1 }} numberOfLines={1}>
-                      {c.name}
-                    </Text>
-                    <Text style={{ color: theme.colors.textMuted, fontFamily: theme.fontFamilies.mono.regular, fontSize: theme.fontSizes.xs, marginRight: 10 }}>
-                      {formatPercent(c.quotaUsedPct)}
-                    </Text>
-                    <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.mono.regular, fontSize: theme.fontSizes.sm }}>
-                      {canSeeMoney ? formatMoney(c.spend) : '—'}
-                    </Text>
-                  </View>
-                ))}
+                {dashboardQuery.data?.topCustomersBySpend.slice(0, 5).map((c, index) => {
+                  const quotaPct = c.quotaUsedPct === null ? null : Math.min(100, Math.max(0, c.quotaUsedPct));
+                  const quotaColor =
+                    quotaPct === null
+                      ? theme.colors.textMuted
+                      : quotaPct >= 100
+                        ? theme.colors.statusErrorFg
+                        : quotaPct >= 75
+                          ? theme.colors.statusWarningFg
+                          : theme.colors.accent;
+                  const isTopRank = index === 0;
+
+                  return (
+                    <View key={c.id} style={[styles.spendRow, { borderBottomColor: theme.colors.border }]}>
+                      <View
+                        style={[
+                          styles.rankChip,
+                          { backgroundColor: isTopRank ? theme.colors.accent : theme.colors.statusNeutralBg, borderRadius: theme.radii.full },
+                        ]}
+                      >
+                        <Text
+                          style={{
+                            color: isTopRank ? theme.colors.textOnAccent : theme.colors.textMuted,
+                            fontFamily: theme.fontFamilies.body.bold,
+                            fontSize: 11,
+                          }}
+                        >
+                          {index + 1}
+                        </Text>
+                      </View>
+
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.body.semibold, fontSize: theme.fontSizes.sm }} numberOfLines={1}>
+                          {c.name}
+                        </Text>
+                        {quotaPct !== null && (
+                          <View style={styles.spendQuotaRow}>
+                            <View style={[styles.spendQuotaTrack, { backgroundColor: theme.colors.statusNeutralBg, borderRadius: theme.radii.full }]}>
+                              <View style={[styles.spendQuotaFill, { width: `${quotaPct}%`, backgroundColor: quotaColor, borderRadius: theme.radii.full }]} />
+                            </View>
+                            <Text style={{ color: theme.colors.textMuted, fontFamily: theme.fontFamilies.mono.regular, fontSize: 11 }}>
+                              {formatPercent(c.quotaUsedPct)} quota
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
+                      <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.mono.regular, fontSize: theme.fontSizes.md }}>
+                        {canSeeMoney ? formatMoney(c.spend) : '—'}
+                      </Text>
+                    </View>
+                  );
+                })}
               </SectionCard>
 
               <SectionCard
@@ -477,12 +517,11 @@ const styles = StyleSheet.create({
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sectionHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  spendRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
+  spendRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, gap: 10 },
+  rankChip: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
+  spendQuotaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 },
+  spendQuotaTrack: { flex: 1, maxWidth: 90, height: 4, overflow: 'hidden' },
+  spendQuotaFill: { height: '100%' },
   chart: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 72, marginTop: 8 },
   chartCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', minWidth: 4 },
   chartBar: { width: '70%', minWidth: 2 },

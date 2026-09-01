@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { SerializedError } from '@reduxjs/toolkit';
 import { FlatList, Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
@@ -145,6 +145,9 @@ export function CustomerAgentsScreen() {
 
   const [tab, setTab] = useState<CloneTab>('all');
   const [page, setPage] = useState(1);
+  // "All clones" is a load-more list, not a numbered pager: every page
+  // fetched so far is appended here and rendered as one growing list.
+  const [loadedRows, setLoadedRows] = useState<Clone[]>([]);
 
   const { data: clonePage, isLoading: isPageLoading, isFetching: isPageFetching, refetch: refetchPage } = useGetClonesQuery({
     page,
@@ -154,6 +157,19 @@ export function CustomerAgentsScreen() {
   const { data: agents } = useGetAgentsQuery();
 
   const [updateClone] = useUpdateCloneMutation();
+
+  // Page 1 always replaces (first load, tab switch back to "all", pull to
+  // refresh — see handleSetTab / onRefresh, both of which reset `page` to
+  // 1). Any later page is appended, de-duplicated by id so a background
+  // refetch of an already-loaded page can never double an entry.
+  useEffect(() => {
+    if (!clonePage) return;
+    setLoadedRows((prev) => {
+      if (clonePage.page <= 1) return clonePage.items;
+      const seen = new Set(prev.map((c) => c.id));
+      return [...prev, ...clonePage.items.filter((c) => !seen.has(c.id))];
+    });
+  }, [clonePage]);
 
   const cloneList = useMemo(() => allClones ?? [], [allClones]);
   const agentList = useMemo(() => agents ?? [], [agents]);
@@ -174,7 +190,12 @@ export function CustomerAgentsScreen() {
     setPage(1);
   };
 
-  const rows: Clone[] = tab === 'all' ? (clonePage?.items ?? []) : filterClonesByTab(cloneList, tab);
+  const handleLoadMore = () => {
+    if (isPageFetching || page >= pageCount) return;
+    setPage((p) => p + 1);
+  };
+
+  const rows: Clone[] = tab === 'all' ? loadedRows : filterClonesByTab(cloneList, tab);
   const isLoading = tab === 'all' ? isPageLoading : isAllLoading;
 
   /* --- Push planning --------------------------------------------------- */
@@ -345,7 +366,17 @@ export function CustomerAgentsScreen() {
           keyExtractor={(c) => c.id}
           contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 24 }]}
           ListHeaderComponent={listHeader}
-          refreshControl={<RefreshControl refreshing={isPageFetching} onRefresh={() => { void refetchPage(); void refetchAll(); }} tintColor={theme.colors.accent} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={isPageFetching}
+              onRefresh={() => {
+                setPage(1);
+                void refetchPage();
+                void refetchAll();
+              }}
+              tintColor={theme.colors.accent}
+            />
+          }
           renderItem={({ item }) => (
             <CloneCard clone={item} canViewSpend={canViewSpend} onPress={() => navigation.navigate('CloneDetail', { id: item.id })} />
           )}
@@ -358,17 +389,15 @@ export function CustomerAgentsScreen() {
             )
           }
           ListFooterComponent={
-            tab === 'all' && !isLoading && pageCount > 1 ? (
+            tab === 'all' && !isLoading && loadedRows.length > 0 && page < pageCount ? (
               <View style={styles.pager}>
-                <TouchableOpacity disabled={page <= 1} onPress={() => setPage((p) => p - 1)} style={[styles.pagerBtn, { opacity: page <= 1 ? 0.4 : 1 }]}>
-                  <Icon name="chevron-left" size={20} color={theme.colors.text} />
-                </TouchableOpacity>
-                <Text style={{ color: theme.colors.textMuted, fontFamily: theme.fontFamilies.body.regular, fontSize: theme.fontSizes.xs }}>
-                  Page {page} of {pageCount} · {total} clones
-                </Text>
-                <TouchableOpacity disabled={page >= pageCount} onPress={() => setPage((p) => p + 1)} style={[styles.pagerBtn, { opacity: page >= pageCount ? 0.4 : 1 }]}>
-                  <Icon name="chevron-right" size={20} color={theme.colors.text} />
-                </TouchableOpacity>
+                <Button
+                  label="Load more"
+                  variant="outline"
+                  loading={isPageFetching}
+                  onPress={handleLoadMore}
+                  fullWidth
+                />
               </View>
             ) : null
           }
@@ -605,8 +634,7 @@ const styles = StyleSheet.create({
   bucketRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginLeft: 36, marginTop: 2 },
   bucketChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 6 },
   notice: { flexDirection: 'row', gap: 8, padding: 10, marginTop: 12, marginLeft: 36, alignItems: 'flex-start' },
-  pager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, paddingVertical: 16 },
-  pagerBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  pager: { alignItems: 'center', justifyContent: 'center', paddingVertical: 16, paddingHorizontal: 8 },
   sheetScrim: { flex: 1, justifyContent: 'flex-end' },
   sheetCard: { maxHeight: '80%', paddingTop: 10 },
   sheetHandle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 10 },

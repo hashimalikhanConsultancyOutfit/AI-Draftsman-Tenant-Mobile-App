@@ -21,5 +21,14 @@ export const env = {
   appEnv,
   apiBaseUrl: API_BASE_URLS[appEnv],
   apiOrigin: 'https://be-api.aidraftsman.ai',
+  /** The web portal's own origin — used as the connector OAuth `returnTo`
+   * (see marketplaceApi.ts's `startConnectorOAuth`). The gateway's 302
+   * lands the SYSTEM BROWSER back on this web page, not back in this app —
+   * there is no mobile deep-link/custom-scheme registered on the gateway's
+   * CORS allow-list yet. The connection itself completes server-side
+   * before that redirect fires, so the app just needs to notice the new
+   * install when the user switches back to it (see ConnectorCatalogueSection's
+   * focus-refetch). */
+  webOrigin: 'https://b2b-fe.aidraftsman.ai',
   isDev: appEnv === 'development',
 } as const;

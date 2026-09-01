@@ -1,6 +1,8 @@
+import { yupResolver } from '@hookform/resolvers/yup';
 import type { SerializedError } from '@reduxjs/toolkit';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useEffect, useMemo, useState } from 'react';
+import { Controller, useForm } from 'react-hook-form';
 import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -14,6 +16,7 @@ import { useAppTheme } from '@/theme/ThemeContext';
 
 import type { CompanyAgentsStackParamList } from '@/navigation/types';
 import { MEMORY_OPTIONS, PRICING_MODE_OPTIONS } from './agentRules';
+import { agentFormSchema, type AgentFormValues } from './schemas/agentFormSchema';
 import {
   useCreateAgentMutation,
   useGetAgentsQuery,
@@ -24,7 +27,7 @@ import {
   useUpdateAgentMutation,
   type AgentFormInput,
 } from './companyAgentsApi';
-import type { Agent, AgentMemory, AgentPricingMode } from './companyAgents.types';
+import type { Agent } from './companyAgents.types';
 
 type Nav = NativeStackNavigationProp<CompanyAgentsStackParamList>;
 type Rt = RouteProp<CompanyAgentsStackParamList, 'AgentForm'>;
@@ -93,6 +96,19 @@ function FieldLabel({ children, hint }: { children: string; hint?: string }) {
   );
 }
 
+/** Same visual language as TextField's own helper text — used under
+ * PillRow/checkbox/switch fields, which aren't TextInputs and so can't use
+ * TextField's built-in `error` prop themselves. */
+function FieldError({ message }: { message?: string }) {
+  const { theme } = useAppTheme();
+  if (!message) return null;
+  return (
+    <Text style={{ color: theme.colors.error, fontFamily: theme.fontFamilies.body.regular, fontSize: theme.fontSizes.xs, marginTop: 6 }}>
+      {message}
+    </Text>
+  );
+}
+
 export function AgentFormScreen() {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
@@ -110,17 +126,32 @@ export function AgentFormScreen() {
   const { data: labs, isLoading: isLabsLoading, isError: isLabsError, error: labsError, refetch: retryLabs } = useGetLabsQuery();
   const { data: knowledgeBases } = useGetAllKnowledgeBasesLiteQuery();
 
-  const [name, setName] = useState('');
+  const {
+    control,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<AgentFormValues>({
+    resolver: yupResolver(agentFormSchema),
+    defaultValues: {
+      name: '',
+      modelSlug: '',
+      tools: '',
+      memory: 'NO_MEMORY',
+      kbIds: [],
+      prompt: '',
+      mode: 'PER_RUN',
+      price: '0.04',
+      isSupportAgent: false,
+      note: '',
+    },
+  });
+
+  const modelSlug = watch('modelSlug');
+
   const [labId, setLabId] = useState('');
-  const [modelSlug, setModelSlug] = useState('');
-  const [tools, setTools] = useState('');
-  const [memory, setMemory] = useState<AgentMemory>('NO_MEMORY');
-  const [kbIds, setKbIds] = useState<string[]>([]);
-  const [prompt, setPrompt] = useState('');
-  const [mode, setMode] = useState<AgentPricingMode>('PER_RUN');
-  const [price, setPrice] = useState('0.04');
-  const [isSupportAgent, setIsSupportAgent] = useState(false);
-  const [note, setNote] = useState('');
   const [hydrated, setHydrated] = useState(false);
 
   /* Resolve which lab an edited agent's stored model belongs to, since the
@@ -131,19 +162,21 @@ export function AgentFormScreen() {
   );
 
   useEffect(() => {
-    if (hydrated || !isEdit) return;
-    if (!editingAgent) return;
-    setName(editingAgent.name);
-    setModelSlug(editingAgent.model ?? '');
-    setTools(editingAgent.tools ?? '');
-    setMemory(editingAgent.memory ?? 'NO_MEMORY');
-    setKbIds(editingAgent.kbIds ?? []);
-    setPrompt(editingAgent.prompt ?? '');
-    setMode(editingAgent.mode);
-    setPrice(String(editingAgent.price ?? 0));
-    setIsSupportAgent(editingAgent.isSupportAgent);
+    if (hydrated || !isEdit || !editingAgent) return;
+    reset({
+      name: editingAgent.name,
+      modelSlug: editingAgent.model ?? '',
+      tools: editingAgent.tools ?? '',
+      memory: editingAgent.memory ?? 'NO_MEMORY',
+      kbIds: editingAgent.kbIds ?? [],
+      prompt: editingAgent.prompt ?? '',
+      mode: editingAgent.mode,
+      price: String(editingAgent.price ?? 0),
+      isSupportAgent: editingAgent.isSupportAgent,
+      note: '',
+    });
     setHydrated(true);
-  }, [editingAgent, hydrated, isEdit]);
+  }, [editingAgent, hydrated, isEdit, reset]);
 
   useEffect(() => {
     if (isEdit && !labId && modelLookup?.found && modelLookup.model) {
@@ -168,34 +201,23 @@ export function AgentFormScreen() {
   const [updateAgent, { isLoading: isUpdating }] = useUpdateAgentMutation();
   const isSubmitting = isCreating || isUpdating;
 
-  const toggleKb = (id: string) => setKbIds((prev) => (prev.includes(id) ? prev.filter((k) => k !== id) : [...prev, id]));
-
-  const handleSubmit = async () => {
-    if (!name.trim()) {
-      toast.show('Give the agent a name.', { tone: 'warning' });
-      return;
-    }
-    if (!modelSlug) {
-      toast.show('Select a lab and a model before saving.', { tone: 'warning' });
-      return;
-    }
-    const priceValue = Number(price);
+  const onSubmit = async (values: AgentFormValues) => {
     const input: AgentFormInput = {
-      name: name.trim(),
-      model: modelSlug,
-      tools,
-      memory,
-      kbIds,
-      prompt,
-      mode,
-      price: Number.isFinite(priceValue) ? priceValue : 0,
+      name: values.name.trim(),
+      model: values.modelSlug,
+      tools: values.tools ?? '',
+      memory: values.memory,
+      kbIds: values.kbIds ?? [],
+      prompt: values.prompt ?? '',
+      mode: values.mode,
+      price: Number(values.price),
       locked: editingAgent?.locked ?? [],
-      isSupportAgent,
+      isSupportAgent: values.isSupportAgent ?? false,
     };
 
     try {
       if (isEdit && editingAgent) {
-        const result = await updateAgent({ id: editingAgent.id, note: note.trim() || undefined, ...input }).unwrap();
+        const result = await updateAgent({ id: editingAgent.id, note: values.note?.trim() || undefined, ...input }).unwrap();
         if (result.definitionInvalidated) {
           toast.show('Saved — evaluation reset, since the definition changed. Re-run Evaluate before publishing.', { tone: 'warning' });
         } else {
@@ -240,7 +262,13 @@ export function AgentFormScreen() {
         </Text>
 
         <Card>
-          <TextField label="Name" value={name} onChangeText={setName} placeholder="e.g. Returns handler" />
+          <Controller
+            control={control}
+            name="name"
+            render={({ field: { value, onChange, onBlur } }) => (
+              <TextField label="Name" value={value} onChangeText={onChange} onBlur={onBlur} placeholder="e.g. Returns handler" error={errors.name?.message} />
+            )}
+          />
         </Card>
 
         <Card>
@@ -255,7 +283,7 @@ export function AgentFormScreen() {
               value={labId}
               onChange={(id) => {
                 setLabId(id);
-                setModelSlug('');
+                setValue('modelSlug', '', { shouldValidate: true });
               }}
             />
           )}
@@ -265,28 +293,47 @@ export function AgentFormScreen() {
           {isModelsLoading ? (
             <Loader />
           ) : (
-            <PillRow
-              options={modelOptions}
-              value={modelSlug}
-              onChange={setModelSlug}
-              disabledHint={labId ? 'No models available for this lab.' : 'Select a lab first.'}
+            <Controller
+              control={control}
+              name="modelSlug"
+              render={({ field: { value, onChange } }) => (
+                <PillRow
+                  options={modelOptions}
+                  value={value}
+                  onChange={onChange}
+                  disabledHint={labId ? 'No models available for this lab.' : 'Select a lab first.'}
+                />
+              )}
             />
           )}
+          <FieldError message={errors.modelSlug?.message} />
         </Card>
 
         <Card>
-          <TextField
-            label="Tools"
-            value={tools}
-            onChangeText={setTools}
-            placeholder="e.g. order-lookup, Drive, Slack"
-            hint="Comma-separated."
+          <Controller
+            control={control}
+            name="tools"
+            render={({ field: { value, onChange, onBlur } }) => (
+              <TextField
+                label="Tools"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                placeholder="e.g. order-lookup, Drive, Slack"
+                hint="Comma-separated."
+                error={errors.tools?.message}
+              />
+            )}
           />
         </Card>
 
         <Card>
           <FieldLabel hint="What the agent remembers between runs.">Memory</FieldLabel>
-          <PillRow options={MEMORY_OPTIONS} value={memory} onChange={setMemory} />
+          <Controller
+            control={control}
+            name="memory"
+            render={({ field: { value, onChange } }) => <PillRow options={MEMORY_OPTIONS} value={value} onChange={onChange} />}
+          />
         </Card>
 
         <Card>
@@ -296,70 +343,109 @@ export function AgentFormScreen() {
               No knowledge bases yet.
             </Text>
           ) : (
-            <View style={{ gap: 8 }}>
-              {(knowledgeBases ?? []).map((kb) => {
-                const checked = kbIds.includes(kb.id);
-                return (
-                  <TouchableOpacity key={kb.id} onPress={() => toggleKb(kb.id)} style={styles.kbRow} activeOpacity={0.7}>
-                    <Icon name={checked ? 'check-box' : 'check-box-outline-blank'} size={20} color={checked ? theme.colors.accent : theme.colors.textMuted} />
-                    <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.body.regular, fontSize: theme.fontSizes.sm }}>{kb.name}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+            <Controller
+              control={control}
+              name="kbIds"
+              render={({ field: { value, onChange } }) => (
+                <View style={{ gap: 8 }}>
+                  {(knowledgeBases ?? []).map((kb) => {
+                    const checked = (value ?? []).includes(kb.id);
+                    return (
+                      <TouchableOpacity
+                        key={kb.id}
+                        onPress={() => onChange(checked ? (value ?? []).filter((k) => k !== kb.id) : [...(value ?? []), kb.id])}
+                        style={styles.kbRow}
+                        activeOpacity={0.7}
+                      >
+                        <Icon name={checked ? 'check-box' : 'check-box-outline-blank'} size={20} color={checked ? theme.colors.accent : theme.colors.textMuted} />
+                        <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.body.regular, fontSize: theme.fontSizes.sm }}>{kb.name}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            />
           )}
         </Card>
 
         <Card>
-          <TextField
-            label="System prompt"
-            value={prompt}
-            onChangeText={setPrompt}
-            placeholder="Describe what this agent should do."
-            multiline
-            numberOfLines={6}
-            style={{ minHeight: 120, textAlignVertical: 'top' }}
+          <Controller
+            control={control}
+            name="prompt"
+            render={({ field: { value, onChange, onBlur } }) => (
+              <TextField
+                label="System prompt"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                placeholder="Describe what this agent should do."
+                multiline
+                numberOfLines={6}
+                style={{ minHeight: 120, textAlignVertical: 'top' }}
+                error={errors.prompt?.message}
+              />
+            )}
           />
         </Card>
 
         <Card>
           <FieldLabel hint="How this agent's runs are charged.">Pricing mode</FieldLabel>
-          <PillRow options={PRICING_MODE_OPTIONS} value={mode} onChange={setMode} />
+          <Controller
+            control={control}
+            name="mode"
+            render={({ field: { value, onChange } }) => <PillRow options={PRICING_MODE_OPTIONS} value={value} onChange={onChange} />}
+          />
           <View style={{ height: 14 }} />
-          <TextField label="Unit price (£)" value={price} onChangeText={setPrice} keyboardType="decimal-pad" />
+          <Controller
+            control={control}
+            name="price"
+            render={({ field: { value, onChange, onBlur } }) => (
+              <TextField label="Unit price (£)" value={value} onChangeText={onChange} onBlur={onBlur} keyboardType="decimal-pad" error={errors.price?.message} />
+            )}
+          />
         </Card>
 
         <Card>
-          <View style={styles.switchRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.body.semibold, fontSize: theme.fontSizes.sm }}>
-                Support agent
-              </Text>
-              <Text style={{ color: theme.colors.textMuted, fontFamily: theme.fontFamilies.body.regular, fontSize: theme.fontSizes.xs, marginTop: 2 }}>
-                Only one agent holds this at a time. Turning it on moves the flag off whichever agent has it now.
-              </Text>
-            </View>
-            <Switch
-              value={isSupportAgent}
-              onValueChange={setIsSupportAgent}
-              trackColor={{ true: theme.colors.accent }}
-            />
-          </View>
+          <Controller
+            control={control}
+            name="isSupportAgent"
+            render={({ field: { value, onChange } }) => (
+              <View style={styles.switchRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.body.semibold, fontSize: theme.fontSizes.sm }}>
+                    Support agent
+                  </Text>
+                  <Text style={{ color: theme.colors.textMuted, fontFamily: theme.fontFamilies.body.regular, fontSize: theme.fontSizes.xs, marginTop: 2 }}>
+                    Only one agent holds this at a time. Turning it on moves the flag off whichever agent has it now.
+                  </Text>
+                </View>
+                <Switch value={value} onValueChange={onChange} trackColor={{ true: theme.colors.accent }} />
+              </View>
+            )}
+          />
         </Card>
 
         {isEdit && (
           <Card>
-            <TextField
-              label="Note"
-              value={note}
-              onChangeText={setNote}
-              placeholder="e.g. Tightened the refund wording after the Q3 audit"
-              hint="Recorded against this version. Optional."
+            <Controller
+              control={control}
+              name="note"
+              render={({ field: { value, onChange, onBlur } }) => (
+                <TextField
+                  label="Note"
+                  value={value}
+                  onChangeText={onChange}
+                  onBlur={onBlur}
+                  placeholder="e.g. Tightened the refund wording after the Q3 audit"
+                  hint="Recorded against this version. Optional."
+                  error={errors.note?.message}
+                />
+              )}
             />
           </Card>
         )}
 
-        <Button label={isEdit ? 'Save changes' : 'Create draft'} onPress={handleSubmit} loading={isSubmitting} fullWidth />
+        <Button label={isEdit ? 'Save changes' : 'Create draft'} onPress={handleSubmit(onSubmit)} loading={isSubmitting} fullWidth />
       </ScrollView>
     </View>
   );

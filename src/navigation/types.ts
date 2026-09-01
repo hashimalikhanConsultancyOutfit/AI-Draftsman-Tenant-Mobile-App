@@ -21,6 +21,15 @@ export type DashboardStackParamList = {
   SpendByDay: { period: string };
   TopBySpend: { period: string };
   RecentRuns: { period: string };
+  /** `CustomerFormScreen` reused in-place from the Customers stack — the
+     dashboard's "Register customer" quick action and empty-state CTA
+     open it inline rather than jumping across to the Customers drawer
+     screen, same convention as MarketplaceStack reusing AgentFormScreen. */
+  CustomerForm: { id?: string };
+  /** `AgentFormScreen` reused in-place from the Company Agents stack —
+     the dashboard's "Create agent" quick action opens it inline rather
+     than switching tabs, same convention as CustomerForm above. */
+  AgentForm: { id?: string };
 };
 
 export type CompanyAgentsStackParamList = {
@@ -36,12 +45,41 @@ export type CustomerAgentsStackParamList = {
   CloneEdit: { id: string };
 };
 
+export type KnowledgeBasesStackParamList = {
+  KnowledgeBasesHome: undefined;
+  KnowledgeBaseDetail: { id: string };
+  KnowledgeBaseEdit: { id?: string };
+  KnowledgeBaseUpload: { id: string };
+};
+
 export type ChatStackParamList = {
   ChatHome: undefined;
 };
 
+export type CustomersStackParamList = {
+  CustomersHome: undefined;
+  CustomerDetail: { id: string };
+  /** No id = register, id present = edit — mirrors AgentForm's convention. */
+  CustomerForm: { id?: string };
+  CustomerSuspend: { id: string };
+  /** The CSV bulk-import flow (its own multi-phase job) — a modal route,
+     opened from the registry's header action. */
+  CustomerImport: undefined;
+};
+
 export type MarketplaceStackParamList = {
   MarketplaceHome: undefined;
+  ConnectorDetail: { slug: string };
+  MarketplaceEntryDetail: { resource: 'skill' | 'agent'; id: string };
+  OwnedSkillDetail: { catalogueId: string };
+  AddSkill: undefined;
+  /* Reuses Company Agents' own detail/edit/clone-out screens in place, the
+     same way web's OwnedAgentsPanel reuses those dialogs rather than
+     navigating away — opening, editing, or cloning out an agent from the
+     marketplace must not leave the Marketplace tab. */
+  AgentForm: { id?: string };
+  AgentDetail: { id: string };
+  AgentCloneOut: { id: string };
 };
 
 export type SettingsStackParamList = {
@@ -72,9 +110,9 @@ export type AppDrawerParamList = {
      active, same as before this carried params. */
   MainTabs: NavigatorScreenParams<AppTabParamList> | undefined;
   CustomerAgents: NavigatorScreenParams<CustomerAgentsStackParamList> | undefined;
-  KnowledgeBases: undefined;
+  KnowledgeBases: NavigatorScreenParams<KnowledgeBasesStackParamList> | undefined;
   Playground: undefined;
-  Customers: undefined;
+  Customers: NavigatorScreenParams<CustomersStackParamList> | undefined;
   Leads: undefined;
   LeadCriteria: undefined;
   Reports: undefined;

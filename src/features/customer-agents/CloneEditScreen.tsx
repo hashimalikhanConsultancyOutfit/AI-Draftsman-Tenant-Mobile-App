@@ -1,5 +1,7 @@
+import { yupResolver } from '@hookform/resolvers/yup';
 import type { SerializedError } from '@reduxjs/toolkit';
 import { useEffect, useState } from 'react';
+import { Controller, useForm } from 'react-hook-form';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -15,6 +17,7 @@ import { useAppTheme } from '@/theme/ThemeContext';
 import type { CustomerAgentsStackParamList } from '@/navigation/types';
 import { CLONE_EDIT_DESCRIPTION, CLONE_HASH_INVALIDATION_MESSAGE, resolveCloneDefinition } from './cloneRules';
 import { useGetAllClonesQuery, useUpdateCloneMutation } from './customerAgentsApi';
+import { cloneEditSchema, type CloneEditFormValues } from './schemas/cloneEditSchema';
 
 type Nav = NativeStackNavigationProp<CustomerAgentsStackParamList>;
 type Rt = RouteProp<CustomerAgentsStackParamList, 'CloneEdit'>;
@@ -31,27 +34,30 @@ export function CloneEditScreen() {
   const clone = clones?.find((c) => c.id === params.id) ?? null;
   const master = agents?.find((a) => a.name === clone?.parent) ?? null;
 
-  const [model, setModel] = useState('');
-  const [tools, setTools] = useState('');
-  const [prompt, setPrompt] = useState('');
-  const [note, setNote] = useState('');
+  const {
+    control,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<CloneEditFormValues>({
+    resolver: yupResolver(cloneEditSchema),
+    defaultValues: { model: '', tools: '', prompt: '', note: '' },
+  });
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     if (hydrated || !clone) return;
     const definition = resolveCloneDefinition(clone, master);
-    setModel(definition.model);
-    setTools(definition.tools);
-    setPrompt(definition.prompt);
+    reset({ model: definition.model, tools: definition.tools, prompt: definition.prompt, note: '' });
     setHydrated(true);
-  }, [clone, master, hydrated]);
+  }, [clone, master, hydrated, reset]);
 
   const [updateClone, { isLoading: isSaving }] = useUpdateCloneMutation();
 
-  const handleSubmit = async () => {
+  const onSubmit = async (values: CloneEditFormValues) => {
     if (!clone) return;
     try {
-      const saved = await updateClone({ id: clone.id, model, tools, prompt, note: note.trim() || undefined }).unwrap();
+      const saved = await updateClone({ id: clone.id, model: values.model, tools: values.tools ?? '', prompt: values.prompt ?? '', note: values.note?.trim() || undefined }).unwrap();
       const div = saved.div;
       const asVersion = saved.version === null ? '' : ` Saved as v${String(saved.version)}.`;
 
@@ -102,34 +108,70 @@ export function CloneEditScreen() {
         </Card>
 
         <Card>
-          <TextField label="Model" value={model} onChangeText={setModel} placeholder="e.g. gpt-4o" hint="Differs from the master? It will show as divergence." />
+          <Controller
+            control={control}
+            name="model"
+            render={({ field: { value, onChange, onBlur } }) => (
+              <TextField
+                label="Model"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                placeholder="e.g. gpt-4o"
+                hint="Differs from the master? It will show as divergence."
+                error={errors.model?.message}
+              />
+            )}
+          />
           <View style={{ height: 14 }} />
-          <TextField label="Tools" value={tools} onChangeText={setTools} placeholder="e.g. order-lookup, Drive, Slack" hint="Comma-separated." />
-        </Card>
-
-        <Card>
-          <TextField
-            label="System prompt"
-            value={prompt}
-            onChangeText={setPrompt}
-            placeholder="Describe what this customer's copy should do."
-            multiline
-            numberOfLines={6}
-            style={{ minHeight: 120, textAlignVertical: 'top' }}
+          <Controller
+            control={control}
+            name="tools"
+            render={({ field: { value, onChange, onBlur } }) => (
+              <TextField label="Tools" value={value} onChangeText={onChange} onBlur={onBlur} placeholder="e.g. order-lookup, Drive, Slack" hint="Comma-separated." error={errors.tools?.message} />
+            )}
           />
         </Card>
 
         <Card>
-          <TextField
-            label="Note"
-            value={note}
-            onChangeText={setNote}
-            placeholder="e.g. Customer asked for softer refund wording"
-            hint="Recorded against this version of the customer's copy, so the history says why it diverged. Optional."
+          <Controller
+            control={control}
+            name="prompt"
+            render={({ field: { value, onChange, onBlur } }) => (
+              <TextField
+                label="System prompt"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                placeholder="Describe what this customer's copy should do."
+                multiline
+                numberOfLines={6}
+                style={{ minHeight: 120, textAlignVertical: 'top' }}
+                error={errors.prompt?.message}
+              />
+            )}
           />
         </Card>
 
-        <Button label="Save clone" onPress={handleSubmit} loading={isSaving} fullWidth />
+        <Card>
+          <Controller
+            control={control}
+            name="note"
+            render={({ field: { value, onChange, onBlur } }) => (
+              <TextField
+                label="Note"
+                value={value}
+                onChangeText={onChange}
+                onBlur={onBlur}
+                placeholder="e.g. Customer asked for softer refund wording"
+                hint="Recorded against this version of the customer's copy, so the history says why it diverged. Optional."
+                error={errors.note?.message}
+              />
+            )}
+          />
+        </Card>
+
+        <Button label="Save clone" onPress={handleSubmit(onSubmit)} loading={isSaving} fullWidth />
       </ScrollView>
     </View>
   );

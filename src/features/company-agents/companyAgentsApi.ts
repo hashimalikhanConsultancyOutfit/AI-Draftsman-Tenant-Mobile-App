@@ -281,6 +281,10 @@ export const companyAgentsApi = api.injectEndpoints({
         const pages = [head, ...rest.map((r) => r.data as PageWire<Row>)];
         return { data: pages.flatMap((p) => p.items.map((c) => ({ id: c.id, name: c.name }))) };
       },
+      // Tagged so a write from the Customers module (create/suspend/
+      // resume/delete) invalidates this picker too — it's the same
+      // `/customers` collection under a lighter shape.
+      providesTags: [{ type: 'Customer', id: 'LIST' }],
     }),
 
     /** Every knowledge base, same reasoning as above. */

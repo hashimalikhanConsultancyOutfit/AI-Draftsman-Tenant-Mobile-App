@@ -11,6 +11,7 @@ import type {
 
 import { clearAllCookies } from '@/services/cookieAuth';
 
+import { api } from './api';
 import type { ApiQueryError } from './baseQuery';
 import { baseQuery } from './baseQuery';
 import {
@@ -61,6 +62,13 @@ export const authApi = createApi({
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
+          // A 200 with no usable body should never happen for this
+          // endpoint, but baseQuery now resolves a bodiless success to
+          // `data: null` (see baseQuery.ts) rather than `undefined` — guard
+          // here so that shape can never throw and get silently absorbed
+          // by the catch below, which would otherwise leave the user
+          // stuck on the Login screen with no error and no OTP screen.
+          if (!data) return;
           if (data.enrolmentRequired) {
             dispatch(credentialsRequireEnrolment({ email: data.email }));
           } else {
@@ -82,6 +90,7 @@ export const authApi = createApi({
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         try {
           const { data } = await queryFulfilled;
+          if (!data) return;
           dispatch(otpVerified(toSessionUser(data)));
         } catch (err) {
           const error = (err as { error?: ApiQueryError }).error;
@@ -98,6 +107,7 @@ export const authApi = createApi({
       query: () => ({ url: '/auth/enrol-totp', method: 'POST' }),
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         const { data } = await queryFulfilled;
+        if (!data) return;
         dispatch(totpEnrolmentStarted(data));
       },
     }),
@@ -106,6 +116,7 @@ export const authApi = createApi({
       query: (body) => ({ url: '/auth/confirm-totp', method: 'POST', body }),
       async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
         const { data } = await queryFulfilled;
+        if (!data) return;
         dispatch(totpConfirmed({ recoveryCodes: data.recoveryCodes }));
       },
     }),
@@ -159,7 +170,17 @@ export const authApi = createApi({
           await queryFulfilled;
         } finally {
           dispatch(signedOutAction());
-          void clearAllCookies();
+          // Purge every cached query result from the portal api slice —
+          // without this, a fast logout -> log back in (as a different
+          // account, or the same one) can briefly render the PREVIOUS
+          // session's cached dashboard/customers/agents/knowledge-bases
+          // data before the authenticated screens refetch.
+          dispatch(api.util.resetApiState());
+          // Awaited (not fire-and-forget) so the native cookie jar is
+          // fully clear before this mutation resolves — otherwise a
+          // logout clear that finishes late can race a following login
+          // and wipe the fresh session/OTP cookies it just set.
+          await clearAllCookies();
         }
       },
     }),

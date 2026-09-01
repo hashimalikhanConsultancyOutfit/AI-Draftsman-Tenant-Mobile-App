@@ -7,8 +7,9 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { Animated, Modal, StyleSheet, Text, View } from 'react-native';
+import { Animated, Modal, Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FullWindowOverlay } from 'react-native-screens';
 
 import { useAppTheme } from '@/theme/ThemeContext';
 
@@ -82,70 +83,82 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<ToastContextValue>(() => ({ show }), [show]);
 
+  const overlay = (
+    <View style={styles.modalRoot} pointerEvents="box-none">
+      {toast && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.container,
+            {
+              top: insets.top + 8,
+              opacity: anim,
+              transform: [
+                {
+                  translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }),
+                },
+              ],
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.pill,
+              {
+                backgroundColor: toneColors[toast.tone].bg,
+                borderRadius: theme.radii.pill,
+                ...theme.shadows.md,
+              },
+            ]}
+          >
+            <Icon name={TONE_ICON[toast.tone]} size={18} color={toneColors[toast.tone].fg} />
+            <Text
+              style={[
+                styles.text,
+                { color: toneColors[toast.tone].fg, fontSize: theme.fontSizes.sm, fontFamily: theme.fontFamilies.body.medium },
+              ]}
+              numberOfLines={2}
+            >
+              {toast.message}
+            </Text>
+          </View>
+        </Animated.View>
+      )}
+    </View>
+  );
+
   return (
     <ToastContext.Provider value={value}>
       {children}
       {/*
-       * Rendered through a native Modal rather than as a plain sibling
-       * view. A plain overlay view lives in the same native layer as the
-       * screen that's currently on top of the JS stack — but a screen
-       * presented with `presentation: 'modal'` (native-stack) opens its
-       * own native view controller / window above that, so a bare
-       * Animated.View here would be visually stuck BEHIND it (this is
-       * why a toast fired while e.g. Clone Out is open used to be
-       * invisible). RN's own Modal always presents above whatever native
-       * layer is currently on top, including another native-stack modal,
-       * so toasts stay visible no matter what screen triggered them.
+       * A screen presented with `presentation: 'modal'` (native-stack)
+       * opens its own native view controller / window above the rest of
+       * the app, so a plain sibling view here would be visually stuck
+       * BEHIND it — a toast fired while such a screen is open (e.g.
+       * Clone Out, or the customer Register/Edit form) used to be
+       * invisible.
+       *
+       * On iOS, RN's own `Modal` is not a reliable fix: it presents via
+       * `RCTPresentedViewController`, whose notion of "currently
+       * presented VC" does not consistently track a native-stack modal
+       * presented through `react-native-screens`, so the toast's Modal
+       * can still end up presented BELOW it. `FullWindowOverlay` (from
+       * `react-native-screens`) instead renders straight under the OS
+       * window, above every presented view controller unconditionally —
+       * the library's own documented answer to exactly this problem.
+       * It only exists on iOS (it warns and no-ops elsewhere), so
+       * Android keeps the Modal-based approach, which does not have this
+       * bug — Android's native-stack "modal" is a Fragment transaction
+       * within the same Activity/Window that a Dialog-backed RN Modal
+       * already draws above.
        */}
-      <Modal
-        visible={Boolean(toast)}
-        transparent
-        animationType="none"
-        statusBarTranslucent
-        onRequestClose={() => undefined}
-      >
-        <View style={styles.modalRoot} pointerEvents="box-none">
-          {toast && (
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                styles.container,
-                {
-                  top: insets.top + 8,
-                  opacity: anim,
-                  transform: [
-                    {
-                      translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              <View
-                style={[
-                  styles.pill,
-                  {
-                    backgroundColor: toneColors[toast.tone].bg,
-                    borderRadius: theme.radii.pill,
-                    ...theme.shadows.md,
-                  },
-                ]}
-              >
-                <Icon name={TONE_ICON[toast.tone]} size={18} color={toneColors[toast.tone].fg} />
-                <Text
-                  style={[
-                    styles.text,
-                    { color: toneColors[toast.tone].fg, fontSize: theme.fontSizes.sm, fontFamily: theme.fontFamilies.body.medium },
-                  ]}
-                  numberOfLines={2}
-                >
-                  {toast.message}
-                </Text>
-              </View>
-            </Animated.View>
-          )}
-        </View>
-      </Modal>
+      {Platform.OS === 'ios' ? (
+        <FullWindowOverlay>{overlay}</FullWindowOverlay>
+      ) : (
+        <Modal visible={Boolean(toast)} transparent animationType="none" statusBarTranslucent onRequestClose={() => undefined}>
+          {overlay}
+        </Modal>
+      )}
     </ToastContext.Provider>
   );
 }

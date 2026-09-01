@@ -15,6 +15,12 @@ export interface ApiRequestArgs {
    * both handled by httpClient's own cookie-jar read), kept for parity with
    * apiRequest's own option. */
   skipAuthHeader?: boolean;
+  /** Extra request headers — currently just `Idempotency-Key` on a couple
+   * of write endpoints (customer register, import apply) that need
+   * double-tap/retry safety on a flaky mobile connection. Merged under
+   * the Content-Type/Cookie headers httpClient sets itself, so this can't
+   * override either. */
+  headers?: Record<string, string>;
 }
 
 export interface ApiQueryError {
@@ -42,8 +48,17 @@ export const baseQuery: BaseQueryFn<ApiRequestArgs, unknown, ApiQueryError> = as
       body: args.body,
       query: args.query,
       skipAuthHeader: args.skipAuthHeader,
+      headers: args.headers,
     });
-    return { data };
+    // A success response with no JSON body (e.g. logout's 204) resolves
+    // `data` to `undefined`. RTK Query's dev-mode result validation treats
+    // `{ data: undefined }` as invalid — indistinguishable from "neither
+    // data nor error set" — and logs an "Error encountered handling the
+    // endpoint ..." console.error, which React Native's LogBox then
+    // surfaces as an on-screen banner (seen on sign-out, whose endpoint
+    // returns no body). `null` is a real, present value, so every
+    // bodiless-but-successful endpoint stays a normal, silent success.
+    return { data: data ?? null };
   } catch (err) {
     if (err instanceof ApiError) {
       if (err.isUnauthorized) {

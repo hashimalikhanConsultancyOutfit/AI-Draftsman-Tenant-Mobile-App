@@ -1,8 +1,6 @@
 import { createDrawerNavigator } from '@react-navigation/drawer';
 
 import { ApiKeysScreen } from '@/features/api-keys/ApiKeysScreen';
-import { CustomersScreen } from '@/features/customers/CustomersScreen';
-import { KnowledgeBasesScreen } from '@/features/knowledge-bases/KnowledgeBasesScreen';
 import { LeadCriteriaScreen } from '@/features/lead-criteria/LeadCriteriaScreen';
 import { LeadsScreen } from '@/features/leads/LeadsScreen';
 import { OrganizationSettingsScreen } from '@/features/organization-settings/OrganizationSettingsScreen';
@@ -16,6 +14,8 @@ import { UsageSpendScreen } from '@/features/usage-spend/UsageSpendScreen';
 import { AppTabs } from './AppTabs';
 import { SidebarContent } from './SidebarContent';
 import { CustomerAgentsStack } from './stacks/CustomerAgentsStack';
+import { CustomersStack } from './stacks/CustomersStack';
+import { KnowledgeBasesStack } from './stacks/KnowledgeBasesStack';
 import type { AppDrawerParamList } from './types';
 
 const Drawer = createDrawerNavigator<AppDrawerParamList>();
@@ -37,9 +37,9 @@ export function AppDrawer() {
     >
       <Drawer.Screen name="MainTabs" component={AppTabs} />
       <Drawer.Screen name="CustomerAgents" component={CustomerAgentsStack} />
-      <Drawer.Screen name="KnowledgeBases" component={KnowledgeBasesScreen} />
+      <Drawer.Screen name="KnowledgeBases" component={KnowledgeBasesStack} />
       <Drawer.Screen name="Playground" component={PlaygroundScreen} />
-      <Drawer.Screen name="Customers" component={CustomersScreen} />
+      <Drawer.Screen name="Customers" component={CustomersStack} />
       <Drawer.Screen name="Leads" component={LeadsScreen} />
       <Drawer.Screen name="LeadCriteria" component={LeadCriteriaScreen} />
       <Drawer.Screen name="Reports" component={ReportsScreen} />

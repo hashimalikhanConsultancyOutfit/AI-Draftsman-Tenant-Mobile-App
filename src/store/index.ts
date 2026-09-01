@@ -4,10 +4,12 @@ import { setupListeners } from '@reduxjs/toolkit/query';
 import { api } from './api';
 import { authApi } from './authApi';
 import authReducer from './authSlice';
+import marketplaceClonesReducer from './marketplaceClonesSlice';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
+    marketplaceClones: marketplaceClonesReducer,
     [authApi.reducerPath]: authApi.reducer,
     [api.reducerPath]: api.reducer,
   },
