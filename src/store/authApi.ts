@@ -169,6 +169,21 @@ export const authApi = createApi({
         try {
           await queryFulfilled;
         } finally {
+          // Cleared BEFORE the phase flips to `signedOut`, not after —
+          // `signedOut` is what remounts AuthNavigator onto the Login
+          // screen and makes it tappable. Neither call site awaits this
+          // mutation's own trigger (SidebarContent/PlaceholderHomeScreen
+          // both fire-and-forget `logout()`), so if the dispatches ran
+          // first, a user fast enough to submit the next login while this
+          // clear was still in flight would have that login's
+          // `/auth/credentials` request queue on the SAME native cookie
+          // module behind this call (buildCookieHeader() and
+          // clearAllCookies() share one native bridge) — stalling or
+          // dropping the request outright, so `credentialsAccepted` never
+          // dispatches and the OTP screen never opens. Awaiting first
+          // means Login isn't on screen, let alone tappable, until the
+          // jar is actually clear.
+          await clearAllCookies();
           dispatch(signedOutAction());
           // Purge every cached query result from the portal api slice —
           // without this, a fast logout -> log back in (as a different
@@ -176,11 +191,6 @@ export const authApi = createApi({
           // session's cached dashboard/customers/agents/knowledge-bases
           // data before the authenticated screens refetch.
           dispatch(api.util.resetApiState());
-          // Awaited (not fire-and-forget) so the native cookie jar is
-          // fully clear before this mutation resolves — otherwise a
-          // logout clear that finishes late can race a following login
-          // and wipe the fresh session/OTP cookies it just set.
-          await clearAllCookies();
         }
       },
     }),
