@@ -26,10 +26,11 @@ interface TextFieldProps extends TextInputProps {
  * shadowing React Native's own TextInput import at call sites. */
 export const TextField = forwardRef<TextInput, TextFieldProps>(
   (
-    { label, error, hint, leftIcon, rightIcon, onRightIconPress, rightIconAccessibilityLabel, style, ...rest },
+    { label, error, hint, leftIcon, rightIcon, onRightIconPress, rightIconAccessibilityLabel, style, editable = true, ...rest },
     ref,
   ) => {
     const { theme } = useAppTheme();
+    const isDisabled = !editable;
 
     return (
       <View style={styles.wrapper}>
@@ -50,7 +51,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(
               borderColor: error ? theme.colors.error : theme.colors.border,
               borderWidth: theme.borders.interactive,
               borderRadius: theme.radii.lg,
-              backgroundColor: theme.colors.surface,
+              backgroundColor: isDisabled ? theme.colors.statusNeutralBg : theme.colors.surface,
               minHeight: theme.controlHeights.md,
             },
           ]}
@@ -62,10 +63,11 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(
           )}
           <TextInput
             ref={ref}
+            editable={editable}
             style={[
               styles.input,
               {
-                color: theme.colors.text,
+                color: isDisabled ? theme.colors.textMuted : theme.colors.text,
                 fontSize: theme.fontSizes.md,
                 fontFamily: theme.fontFamilies.body.regular,
                 paddingLeft: leftIcon ? theme.space('sm') : theme.space('md'),
@@ -75,6 +77,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(
             ]}
             placeholderTextColor={theme.colors.textMuted}
             accessibilityLabel={label}
+            accessibilityState={{ disabled: isDisabled }}
             {...rest}
           />
           {rightIcon && (

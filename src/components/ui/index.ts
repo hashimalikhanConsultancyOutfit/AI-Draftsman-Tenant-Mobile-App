@@ -5,5 +5,6 @@ export { ErrorState } from './ErrorState';
 export { Icon, NAV_ICON_MAP, type IconName, type NavIconKey } from './Icon';
 export { Loader } from './Loader';
 export { OtpInput } from './OtpInput';
+export { Switch } from './Switch';
 export { TextField } from './TextField';
 export { ToastProvider, useToast } from './Toast';

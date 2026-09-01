@@ -1,8 +1,17 @@
-import { DarkTheme, DefaultTheme, NavigationContainer, type LinkingOptions, type Theme } from '@react-navigation/native';
+import { useCallback, useRef, useState } from 'react';
+import {
+  DarkTheme,
+  DefaultTheme,
+  NavigationContainer,
+  type LinkingOptions,
+  type NavigationContainerRef,
+  type Theme,
+} from '@react-navigation/native';
 
 import { useAppSelector } from '@/store/hooks';
 import { useAppTheme } from '@/theme/ThemeContext';
 
+import { ActiveRoutePathContext, getActiveRoutePath } from './activeRoute';
 import { AppNavigator } from './AppNavigator';
 import { AuthNavigator } from './AuthNavigator';
 
@@ -22,7 +31,6 @@ const linking: LinkingOptions<Record<string, unknown>> = {
     screens: {
       Login: 'login',
       ResetPassword: 'reset-password/:token',
-      PlaceholderHome: 'home',
     },
   },
 };
@@ -31,6 +39,16 @@ export function RootNavigator() {
   const { theme, isDark } = useAppTheme();
   const phase = useAppSelector((state) => state.auth.phase);
   const isAuthenticated = phase === 'authenticated';
+
+  // See activeRoute.ts — this is the single source of truth the sidebar
+  // reads to know which tab/screen is really focused, including inside
+  // nested navigators (e.g. the bottom tabs living inside the drawer).
+  const navigationRef = useRef<NavigationContainerRef<Record<string, unknown>>>(null);
+  const [activeRoutePath, setActiveRoutePath] = useState<string[]>([]);
+
+  const syncActiveRoutePath = useCallback(() => {
+    setActiveRoutePath(getActiveRoutePath(navigationRef.current?.getRootState()));
+  }, []);
 
   const navigationTheme: Theme = {
     ...(isDark ? DarkTheme : DefaultTheme),
@@ -46,8 +64,16 @@ export function RootNavigator() {
   };
 
   return (
-    <NavigationContainer linking={linking} theme={navigationTheme}>
-      {isAuthenticated ? <AppNavigator /> : <AuthNavigator />}
-    </NavigationContainer>
+    <ActiveRoutePathContext.Provider value={activeRoutePath}>
+      <NavigationContainer
+        ref={navigationRef}
+        linking={linking}
+        theme={navigationTheme}
+        onReady={syncActiveRoutePath}
+        onStateChange={syncActiveRoutePath}
+      >
+        {isAuthenticated ? <AppNavigator /> : <AuthNavigator />}
+      </NavigationContainer>
+    </ActiveRoutePathContext.Provider>
   );
 }

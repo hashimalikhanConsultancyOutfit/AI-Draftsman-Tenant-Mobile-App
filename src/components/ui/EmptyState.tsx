@@ -3,10 +3,10 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useAppTheme } from '@/theme/ThemeContext';
 
 import { Button } from './Button';
-import { Icon, type IconName } from './Icon';
+import { Icon, type IconName, type NavIconKey } from './Icon';
 
 interface EmptyStateProps {
-  icon?: IconName;
+  icon?: IconName | NavIconKey;
   title: string;
   description?: string;
   actionLabel?: string;

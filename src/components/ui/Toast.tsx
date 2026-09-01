@@ -2,11 +2,12 @@ import {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
 } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Modal, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAppTheme } from '@/theme/ThemeContext';
@@ -79,48 +80,72 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     warning: { bg: theme.colors.statusWarningBg, fg: theme.colors.statusWarningFg },
   };
 
+  const value = useMemo<ToastContextValue>(() => ({ show }), [show]);
+
   return (
-    <ToastContext.Provider value={{ show }}>
+    <ToastContext.Provider value={value}>
       {children}
-      {toast && (
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.container,
-            {
-              top: insets.top + 8,
-              opacity: anim,
-              transform: [
-                {
-                  translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }),
-                },
-              ],
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.pill,
-              {
-                backgroundColor: toneColors[toast.tone].bg,
-                borderRadius: theme.radii.pill,
-                ...theme.shadows.md,
-              },
-            ]}
-          >
-            <Icon name={TONE_ICON[toast.tone]} size={18} color={toneColors[toast.tone].fg} />
-            <Text
+      {/*
+       * Rendered through a native Modal rather than as a plain sibling
+       * view. A plain overlay view lives in the same native layer as the
+       * screen that's currently on top of the JS stack — but a screen
+       * presented with `presentation: 'modal'` (native-stack) opens its
+       * own native view controller / window above that, so a bare
+       * Animated.View here would be visually stuck BEHIND it (this is
+       * why a toast fired while e.g. Clone Out is open used to be
+       * invisible). RN's own Modal always presents above whatever native
+       * layer is currently on top, including another native-stack modal,
+       * so toasts stay visible no matter what screen triggered them.
+       */}
+      <Modal
+        visible={Boolean(toast)}
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        onRequestClose={() => undefined}
+      >
+        <View style={styles.modalRoot} pointerEvents="box-none">
+          {toast && (
+            <Animated.View
+              pointerEvents="none"
               style={[
-                styles.text,
-                { color: toneColors[toast.tone].fg, fontSize: theme.fontSizes.sm, fontFamily: theme.fontFamilies.body.medium },
+                styles.container,
+                {
+                  top: insets.top + 8,
+                  opacity: anim,
+                  transform: [
+                    {
+                      translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }),
+                    },
+                  ],
+                },
               ]}
-              numberOfLines={2}
             >
-              {toast.message}
-            </Text>
-          </View>
-        </Animated.View>
-      )}
+              <View
+                style={[
+                  styles.pill,
+                  {
+                    backgroundColor: toneColors[toast.tone].bg,
+                    borderRadius: theme.radii.pill,
+                    ...theme.shadows.md,
+                  },
+                ]}
+              >
+                <Icon name={TONE_ICON[toast.tone]} size={18} color={toneColors[toast.tone].fg} />
+                <Text
+                  style={[
+                    styles.text,
+                    { color: toneColors[toast.tone].fg, fontSize: theme.fontSizes.sm, fontFamily: theme.fontFamilies.body.medium },
+                  ]}
+                  numberOfLines={2}
+                >
+                  {toast.message}
+                </Text>
+              </View>
+            </Animated.View>
+          )}
+        </View>
+      </Modal>
     </ToastContext.Provider>
   );
 }
@@ -132,6 +157,7 @@ export function useToast(): ToastContextValue {
 }
 
 const styles = StyleSheet.create({
+  modalRoot: { flex: 1 },
   container: {
     position: 'absolute',
     left: 16,
