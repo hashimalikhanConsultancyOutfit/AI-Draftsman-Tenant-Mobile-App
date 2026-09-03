@@ -45,6 +45,8 @@ export const api = createApi({
     'LeadCriteria',
     'LeadEvaluationCriterion',
     'Report',
+    'ApiKey',
+    'KeyPolicy',
   ],
   endpoints: () => ({}),
 });

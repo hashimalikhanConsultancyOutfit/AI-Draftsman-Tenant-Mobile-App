@@ -57,6 +57,10 @@ export function AppTabs() {
               height: 80,
               paddingBottom: 24,
               paddingTop: 8,
+              /* Without this the first/last tab's icon+label sit flush
+               * against the screen edge — no different from the content
+               * padding every other screen in this app already gets. */
+              paddingHorizontal: theme.space('lg'),
             },
         tabBarLabelStyle: {
           fontSize: 11,

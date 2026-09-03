@@ -134,6 +134,20 @@ export type ReportsStackParamList = {
   ReportLogs: { id: string; name?: string };
 };
 
+export type ApiKeysStackParamList = {
+  ApiKeysHome: undefined;
+  /** No id = create, id present = edit. */
+  ApiKeyForm: { id?: string };
+  /** `name` is passed through only so the header has something to show
+   * immediately — same convention as `ReportLogs`. */
+  KeyUsage: { id: string; name?: string };
+  RotatingKeys: undefined;
+  Policies: undefined;
+  /** No id = create, id present = edit. */
+  PolicyForm: { id?: string };
+  PolicyView: { id: string };
+};
+
 export type SettingsStackParamList = {
   SettingsHome: undefined;
   Appearance: undefined;
@@ -170,7 +184,7 @@ export type AppDrawerParamList = {
   LeadCriteria: NavigatorScreenParams<LeadCriteriaStackParamList> | undefined;
   Reports: NavigatorScreenParams<ReportsStackParamList> | undefined;
   UsageSpend: undefined;
-  ApiKeys: undefined;
+  ApiKeys: NavigatorScreenParams<ApiKeysStackParamList> | undefined;
   Team: undefined;
   RolesPermissions: undefined;
   OrganizationSettings: undefined;

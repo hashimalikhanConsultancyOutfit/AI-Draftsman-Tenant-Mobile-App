@@ -1,6 +1,5 @@
 import { createDrawerNavigator } from '@react-navigation/drawer';
 
-import { ApiKeysScreen } from '@/features/api-keys/ApiKeysScreen';
 import { OrganizationSettingsScreen } from '@/features/organization-settings/OrganizationSettingsScreen';
 import { RolesPermissionsScreen } from '@/features/roles/RolesPermissionsScreen';
 import { SupportScreen } from '@/features/support/SupportScreen';
@@ -9,6 +8,7 @@ import { UsageSpendScreen } from '@/features/usage-spend/UsageSpendScreen';
 
 import { AppTabs } from './AppTabs';
 import { SidebarContent } from './SidebarContent';
+import { ApiKeysStack } from './stacks/ApiKeysStack';
 import { ChatConversationStack } from './stacks/ChatConversationStack';
 import { CustomerAgentsStack } from './stacks/CustomerAgentsStack';
 import { CustomersStack } from './stacks/CustomersStack';
@@ -46,7 +46,7 @@ export function AppDrawer() {
       <Drawer.Screen name="LeadCriteria" component={LeadCriteriaStack} />
       <Drawer.Screen name="Reports" component={ReportsStack} />
       <Drawer.Screen name="UsageSpend" component={UsageSpendScreen} />
-      <Drawer.Screen name="ApiKeys" component={ApiKeysScreen} />
+      <Drawer.Screen name="ApiKeys" component={ApiKeysStack} />
       <Drawer.Screen name="Team" component={TeamScreen} />
       <Drawer.Screen name="RolesPermissions" component={RolesPermissionsScreen} />
       <Drawer.Screen name="OrganizationSettings" component={OrganizationSettingsScreen} />
