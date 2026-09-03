@@ -1,11 +1,7 @@
 import { createDrawerNavigator } from '@react-navigation/drawer';
 
 import { ApiKeysScreen } from '@/features/api-keys/ApiKeysScreen';
-import { LeadCriteriaScreen } from '@/features/lead-criteria/LeadCriteriaScreen';
-import { LeadsScreen } from '@/features/leads/LeadsScreen';
 import { OrganizationSettingsScreen } from '@/features/organization-settings/OrganizationSettingsScreen';
-import { PlaygroundScreen } from '@/features/playground/PlaygroundScreen';
-import { ReportsScreen } from '@/features/reports/ReportsScreen';
 import { RolesPermissionsScreen } from '@/features/roles/RolesPermissionsScreen';
 import { SupportScreen } from '@/features/support/SupportScreen';
 import { TeamScreen } from '@/features/team/TeamScreen';
@@ -13,9 +9,14 @@ import { UsageSpendScreen } from '@/features/usage-spend/UsageSpendScreen';
 
 import { AppTabs } from './AppTabs';
 import { SidebarContent } from './SidebarContent';
+import { ChatConversationStack } from './stacks/ChatConversationStack';
 import { CustomerAgentsStack } from './stacks/CustomerAgentsStack';
 import { CustomersStack } from './stacks/CustomersStack';
 import { KnowledgeBasesStack } from './stacks/KnowledgeBasesStack';
+import { LeadCriteriaStack } from './stacks/LeadCriteriaStack';
+import { LeadsStack } from './stacks/LeadsStack';
+import { PlaygroundStack } from './stacks/PlaygroundStack';
+import { ReportsStack } from './stacks/ReportsStack';
 import type { AppDrawerParamList } from './types';
 
 const Drawer = createDrawerNavigator<AppDrawerParamList>();
@@ -36,13 +37,14 @@ export function AppDrawer() {
       drawerContent={(props) => <SidebarContent {...props} />}
     >
       <Drawer.Screen name="MainTabs" component={AppTabs} />
+      <Drawer.Screen name="ChatConversationStack" component={ChatConversationStack} />
       <Drawer.Screen name="CustomerAgents" component={CustomerAgentsStack} />
       <Drawer.Screen name="KnowledgeBases" component={KnowledgeBasesStack} />
-      <Drawer.Screen name="Playground" component={PlaygroundScreen} />
+      <Drawer.Screen name="Playground" component={PlaygroundStack} />
       <Drawer.Screen name="Customers" component={CustomersStack} />
-      <Drawer.Screen name="Leads" component={LeadsScreen} />
-      <Drawer.Screen name="LeadCriteria" component={LeadCriteriaScreen} />
-      <Drawer.Screen name="Reports" component={ReportsScreen} />
+      <Drawer.Screen name="Leads" component={LeadsStack} />
+      <Drawer.Screen name="LeadCriteria" component={LeadCriteriaStack} />
+      <Drawer.Screen name="Reports" component={ReportsStack} />
       <Drawer.Screen name="UsageSpend" component={UsageSpendScreen} />
       <Drawer.Screen name="ApiKeys" component={ApiKeysScreen} />
       <Drawer.Screen name="Team" component={TeamScreen} />

@@ -67,8 +67,12 @@ export const baseQuery: BaseQueryFn<ApiRequestArgs, unknown, ApiQueryError> = as
           api.dispatch(sessionExpired());
           // Stale/expired cookie hygiene — a dead session cookie left in the
           // native jar would otherwise keep being sent (and keep 401ing) on
-          // every request until the user explicitly logs out.
-          void clearAllCookies();
+          // every request until the user explicitly logs out. Awaited, not
+          // fired-and-forgotten: this lands the user on the Login screen, so
+          // the very next request is likely to be their sign-in, and that
+          // request must not build its Cookie header while this clear is
+          // still running (see services/cookieAuth.ts).
+          await clearAllCookies();
         }
       }
       return {

@@ -185,3 +185,50 @@ export interface EvaluationBadge {
   label: string;
   tone: 'success' | 'error' | 'neutral';
 }
+
+/* -------------------------------------------------------------------------- */
+/* Version history — read by both Company agents and Playground              */
+/* -------------------------------------------------------------------------- */
+
+/** One row of `GET /agents/{id}/versions`, ported from web's `AgentVersionWire`
+ * (confirmed against `src/types/agent.types.ts` on 2026-09-03). */
+export interface AgentVersionWire {
+  id: string;
+  agentId: string;
+  version: number;
+  evaluationScore: number | null;
+  note: string | null;
+  restoredFromVersion: number | null;
+  createdAt: string;
+  creator: { id: string; name: string | null; email: string } | null;
+  definition?: {
+    prompt?: string;
+    modelSlug?: string;
+    tools?: string[];
+    memory?: AgentMemory;
+    knowledgeBaseIds?: string[];
+    knowledgeBaseId?: string | null;
+  };
+  definitionInvalidated?: boolean;
+}
+
+export interface AgentVersionsPageWire {
+  items: AgentVersionWire[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface UpdateAgentPromptRequest {
+  agentId: string;
+  prompt: string;
+  note?: string;
+}
+
+/** Moves the agent onto one of its own existing versions — writes nothing new,
+ * so it may run in either direction and be repeated freely. */
+export interface RestoreAgentVersionRequest {
+  agentId: string;
+  version: number;
+}

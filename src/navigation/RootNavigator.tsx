@@ -8,6 +8,7 @@ import {
   type Theme,
 } from '@react-navigation/native';
 
+import { selectIsFullyAuthenticated } from '@/store/authSlice';
 import { useAppSelector } from '@/store/hooks';
 import { useAppTheme } from '@/theme/ThemeContext';
 
@@ -37,8 +38,12 @@ const linking: LinkingOptions<Record<string, unknown>> = {
 
 export function RootNavigator() {
   const { theme, isDark } = useAppTheme();
-  const phase = useAppSelector((state) => state.auth.phase);
-  const isAuthenticated = phase === 'authenticated';
+  // Both halves of the sign-in must be done before the app stack mounts:
+  // password (isLoggedIn) AND second factor (isOtpVerified), with the phase
+  // settled on `authenticated`. Sign-out resets all three together, so the
+  // next attempt starts from the Login screen every time — see
+  // store/authSlice.ts.
+  const isAuthenticated = useAppSelector(selectIsFullyAuthenticated);
 
   // See activeRoute.ts — this is the single source of truth the sidebar
   // reads to know which tab/screen is really focused, including inside

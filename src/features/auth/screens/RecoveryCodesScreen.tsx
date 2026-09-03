@@ -33,8 +33,18 @@ export function RecoveryCodesScreen() {
   };
 
   const handleContinue = async () => {
+    // Session first, acknowledgement second. Clearing freshRecoveryCodes
+    // while the phase is still `awaitingTotpEnrolment` would briefly make
+    // the enrolment screen the valid one again (see AuthNavigator), so the
+    // user would watch this screen flash back to the QR step on its way
+    // into the app.
+    try {
+      await triggerGetSession().unwrap();
+    } catch {
+      // Leave the codes on screen — the button stays tappable to retry.
+      return;
+    }
     dispatch(recoveryCodesAcknowledged());
-    await triggerGetSession().unwrap().catch(() => undefined);
   };
 
   return (

@@ -22,12 +22,53 @@ import { env } from '@/config/env';
  * header — that restriction is browser-only.
  */
 
+/**
+ * Every call below goes through one FIFO queue.
+ *
+ * `CookieManager` is a single native module: a read (`getCookieHeader`)
+ * and a wipe (`clearAll`) issued concurrently race on the same underlying
+ * cookie store, and on a sign-out immediately followed by a sign-in that is
+ * exactly what happens — the outgoing `POST /auth/credentials` builds its
+ * Cookie header while sign-out's `clearAll` is still in flight. Depending
+ * on which lands first the request either carries a dead session cookie or
+ * stalls on the bridge, so `credentialsAccepted` never dispatches and the
+ * user is left staring at the Login screen with no OTP step. Serialising
+ * removes the race outright: a header build started after a clear always
+ * sees the cleared jar, and never overlaps it.
+ */
+let cookieOperations: Promise<unknown> = Promise.resolve();
+
+function serialise<T>(operation: () => Promise<T>): Promise<T> {
+  // `.then(op, op)` so one rejected operation can't wedge the queue.
+  const result = cookieOperations.then(operation, operation);
+  cookieOperations = result.catch(() => undefined);
+  return result;
+}
+
 const OTP_COOKIE_NAME = 'b2b_otp';
 const SESSION_COOKIE_NAME = 'b2b_session';
 
+/**
+ * Reads the WebKit cookie store first (`useWebKit: true` — `WKHTTPCookieStore`,
+ * the jar a `WKWebView` would see), then falls back to the Foundation store
+ * (`NSHTTPCookieStorage.shared`, `useWebKit: false`) if that comes back
+ * empty. The two are genuinely separate jars on iOS. This app has no
+ * WKWebView and never calls `CookieManager.set()`/`setFromResponse()`
+ * itself — the session cookie only ever gets into a store because native
+ * `fetch()` (URLSession) auto-persists the backend's `Set-Cookie` response
+ * header, and URLSession's default configuration writes to the FOUNDATION
+ * store, not WebKit's. Reading webkit-only was therefore finding an empty
+ * jar every time (not intermittently) even though the session was
+ * genuinely valid — REST calls kept working because they go through
+ * `fetch()` directly rather than through this read path. Trying both,
+ * webkit first, keeps this working if a future WKWebView-based flow (e.g.
+ * an OAuth connector) ever writes the cookie into that store instead.
+ */
 async function getCookieValue(name: string): Promise<string | undefined> {
-  const cookies = await CookieManager.get(env.apiOrigin, true);
-  return cookies[name]?.value;
+  const webkitCookies = await serialise(() => CookieManager.get(env.apiOrigin, true));
+  if (webkitCookies[name]?.value) return webkitCookies[name].value;
+  const foundationCookies = await serialise(() => CookieManager.get(env.apiOrigin, false));
+  return foundationCookies[name]?.value;
 }
 
 export async function getSessionCookie(): Promise<string | undefined> {
@@ -44,9 +85,25 @@ export async function getOtpTicketCookie(): Promise<string | undefined> {
  * `env.apiOrigin` (e.g. the `b2b_otp` cookie's `Path=/api/v1/auth`
  * scoping) is resolved by the same logic a real cookie store uses,
  * rather than reimplemented here.
+ *
+ * Deliberately webkit-only, NOT mirroring `getCookieValue`'s Foundation
+ * fallback. Measured live: adding that fallback here made login pass
+ * credentials + OTP (both 201) and then every following authenticated
+ * request 401 — the explicitly-attached Foundation-store header overrides
+ * whatever URLSession would have sent implicitly, and it disagreed with
+ * that in some way the backend rejected (stale relative to the session
+ * cookie `verify-otp`'s response had just set, or formatted differently
+ * from the header URLSession itself would build). httpClient already
+ * tolerates this returning `undefined` — it just omits the header
+ * (httpClient.ts's `if (cookieHeader) headers['Cookie'] = ...`) and lets
+ * `fetch()`'s own implicit attachment from the Foundation store carry the
+ * request, which is how every REST call has always actually authenticated.
+ * `getSessionCookie()` still needs the Foundation fallback: the chat
+ * socket has no implicit-attachment equivalent and reads the raw token
+ * itself, so it has no fallback path to fall back to.
  */
 export async function buildCookieHeader(): Promise<string | undefined> {
-  const header = await CookieManager.getCookieHeader(env.apiOrigin, true);
+  const header = await serialise(() => CookieManager.getCookieHeader(env.apiOrigin, true));
   return header.length > 0 ? header : undefined;
 }
 
@@ -63,5 +120,9 @@ export async function hasSessionCookie(): Promise<boolean> {
  * shared or reset device.
  */
 export async function clearAllCookies(): Promise<void> {
-  await CookieManager.clearAll(true);
+  // Both stores — see `getCookieValue`'s note. Clearing only the WebKit jar
+  // would leave the session cookie sitting untouched in the Foundation
+  // store it actually lives in, defeating the point of a hard sign-out.
+  await serialise(() => CookieManager.clearAll(true));
+  await serialise(() => CookieManager.clearAll(false));
 }

@@ -191,6 +191,13 @@ export const authApi = createApi({
           // session's cached dashboard/customers/agents/knowledge-bases
           // data before the authenticated screens refetch.
           dispatch(api.util.resetApiState());
+          // The authApi cache itself is deliberately NOT reset here: nothing
+          // reads its cached GET /auth/session result directly (authSlice is
+          // the only source of truth for auth state, and signedOut above has
+          // already emptied it), and resetting it would trigger an immediate
+          // refetch from BootstrapGate's still-live subscription — a
+          // /auth/session round-trip racing the user's next sign-in for no
+          // benefit.
         }
       },
     }),

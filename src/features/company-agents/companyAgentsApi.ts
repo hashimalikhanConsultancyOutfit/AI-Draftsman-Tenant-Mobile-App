@@ -24,9 +24,17 @@ import type {
   LabModelLookup,
   UpdateAgentWire,
   UpdatedAgentWire,
+  AgentVersionWire,
+  AgentVersionsPageWire,
+  UpdateAgentPromptRequest,
+  RestoreAgentVersionRequest,
 } from './companyAgents.types';
 
 const PAGE_SIZE = 100;
+
+/** Rows per page of version history — `DEFAULT_LIMIT` on the gateway, mirrors
+ * web's `AGENT_VERSIONS_PAGE_SIZE`. */
+export const AGENT_VERSIONS_PAGE_SIZE = 20;
 
 /** `"Slack, Drive,  order-lookup"` -> `['Slack', 'Drive', 'order-lookup']`. */
 const parseTools = (tools: string): string[] =>
@@ -238,6 +246,37 @@ export const companyAgentsApi = api.injectEndpoints({
       invalidatesTags: (_r, _e, { agentId }) => [{ type: 'Agent', id: agentId }],
     }),
 
+    /**
+     * One page of an agent's version history, newest first — pinned
+     * `sortBy=version&sortOrder=desc` so page 1 is always the version
+     * currently in force. Read by both this module's own detail screen (not
+     * wired in yet) and the Playground module.
+     */
+    getAgentVersions: builder.query<
+      AgentVersionsPageWire,
+      { agentId: string; page?: number; limit?: number }
+    >({
+      query: ({ agentId, page = 1, limit = AGENT_VERSIONS_PAGE_SIZE }) => ({
+        url: `/agents/${agentId}/versions?page=${String(page)}&limit=${String(limit)}&sortBy=version&sortOrder=desc`,
+      }),
+      providesTags: (_result, _error, { agentId }) => [{ type: 'Agent', id: agentId }],
+    }),
+
+    /** Saves a new prompt version — cuts a new row in the history rather than
+     * editing one in place. */
+    updateAgentPrompt: builder.mutation<AgentVersionWire, UpdateAgentPromptRequest>({
+      query: ({ agentId, ...body }) => ({ url: `/agents/${agentId}/prompt`, method: 'PUT', body }),
+      invalidatesTags: (_r, _e, { agentId }) => [{ type: 'Agent', id: agentId }, { type: 'Agent', id: 'LIST' }],
+    }),
+
+    /** Moves the agent onto an existing version. Writes nothing new — a PUT to
+     * "which version is current", not a POST that appends a row — so it can be
+     * repeated in either direction as often as needed. */
+    restoreAgentVersion: builder.mutation<AgentVersionWire, RestoreAgentVersionRequest>({
+      query: ({ agentId, version }) => ({ url: `/agents/${agentId}/versions/${version}/current`, method: 'PUT' }),
+      invalidatesTags: (_r, _e, { agentId }) => [{ type: 'Agent', id: agentId }, { type: 'Agent', id: 'LIST' }],
+    }),
+
     /* --- Lab -> Model picker, needed by create/edit ------------------------ */
 
     getLabs: builder.query<Lab[], void>({
@@ -324,6 +363,9 @@ export const {
   useGetAgentEvaluationQuery,
   usePublishAgentMutation,
   useCloneAgentToCustomersMutation,
+  useGetAgentVersionsQuery,
+  useUpdateAgentPromptMutation,
+  useRestoreAgentVersionMutation,
   useGetLabsQuery,
   useGetLabModelsQuery,
   useLookupLabModelQuery,

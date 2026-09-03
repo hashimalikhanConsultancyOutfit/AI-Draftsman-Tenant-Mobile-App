@@ -35,6 +35,16 @@ export const api = createApi({
     'AgentCategory',
     'MarketplaceSkill',
     'MarketplaceAgent',
+    'ChatThread',
+    /* Keyed by conversationId — one transcript entry per thread. */
+    'ChatMessage',
+    'ChatBalance',
+    'ChatModels',
+    'Lead',
+    'LeadAttachment',
+    'LeadCriteria',
+    'LeadEvaluationCriterion',
+    'Report',
   ],
   endpoints: () => ({}),
 });

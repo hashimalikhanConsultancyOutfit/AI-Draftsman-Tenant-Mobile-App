@@ -141,7 +141,11 @@ export function AgentFormScreen() {
       tools: '',
       memory: 'NO_MEMORY',
       kbIds: [],
-      prompt: '',
+      /* Seeded from Playground's "Save as agent", when it came from there — see
+         `PlaygroundStackParamList`. Empty for every other entry point (Company
+         agents' own "Create", Dashboard's and Marketplace's quick actions),
+         exactly as before. */
+      prompt: params?.initialPrompt ?? '',
       mode: 'PER_RUN',
       price: '0.04',
       isSupportAgent: false,

@@ -29,13 +29,13 @@ export type DashboardStackParamList = {
   /** `AgentFormScreen` reused in-place from the Company Agents stack —
      the dashboard's "Create agent" quick action opens it inline rather
      than switching tabs, same convention as CustomerForm above. */
-  AgentForm: { id?: string };
+  AgentForm: { id?: string; initialPrompt?: string };
 };
 
 export type CompanyAgentsStackParamList = {
   CompanyAgentsHome: undefined;
   AgentDetail: { id: string };
-  AgentForm: { id?: string };
+  AgentForm: { id?: string; initialPrompt?: string };
   AgentCloneOut: { id: string };
 };
 
@@ -56,6 +56,25 @@ export type ChatStackParamList = {
   ChatHome: undefined;
 };
 
+/** A conversation and everything opened from inside one — deliberately its
+ * own stack, mounted as a drawer-level sibling of `MainTabs` (see
+ * AppDrawer.tsx) rather than nested inside `ChatStackParamList`/`ChatTab`.
+ * Living outside the bottom-tab navigator means there is no tab bar
+ * occupying screen space here at all, which is what the composer needs to
+ * sit flush above the keyboard — nesting it under the tabs meant relying on
+ * `AppTabs.tsx`'s reactive `keyboardVisible` hide, a beat late in both
+ * directions. */
+export type ChatConversationStackParamList = {
+  /** `title` is passed through only so the header has something to show
+   * before `GET /conversations/:id` resolves — the thread's real name
+   * always comes from the query once it lands. */
+  ChatConversation: { conversationId: string; title?: string };
+  /** The web's right-hand rail: model, retention and the cost readout.
+   * A pushed screen here rather than a third column. */
+  ChatThreadDetails: { conversationId: string };
+  ChatThreadSearch: undefined;
+};
+
 export type CustomersStackParamList = {
   CustomersHome: undefined;
   CustomerDetail: { id: string };
@@ -65,6 +84,30 @@ export type CustomersStackParamList = {
   /** The CSV bulk-import flow (its own multi-phase job) — a modal route,
      opened from the registry's header action. */
   CustomerImport: undefined;
+};
+
+export type LeadsStackParamList = {
+  LeadsHome: undefined;
+  LeadDetail: { id: string };
+  /** No id = add, id present = edit — mirrors CustomerForm's convention. */
+  LeadForm: { id?: string };
+  LeadReasoning: undefined;
+};
+
+export type LeadCriteriaStackParamList = {
+  LeadCriteriaHome: undefined;
+  /** No id = create, id present = edit. */
+  LeadCriteriaForm: { id?: string };
+  LeadCriteriaRules: { id: string };
+};
+
+export type PlaygroundStackParamList = {
+  PlaygroundHome: undefined;
+  /** `AgentFormScreen` reused in-place from the Company Agents stack — "Save
+   * as agent" opens it inline, seeded with the prompt currently in the
+   * editor, rather than switching tabs. Same convention as Dashboard's and
+   * Marketplace's own reuse of this screen. */
+  AgentForm: { id?: string; initialPrompt?: string };
 };
 
 export type MarketplaceStackParamList = {
@@ -77,9 +120,18 @@ export type MarketplaceStackParamList = {
      same way web's OwnedAgentsPanel reuses those dialogs rather than
      navigating away — opening, editing, or cloning out an agent from the
      marketplace must not leave the Marketplace tab. */
-  AgentForm: { id?: string };
+  AgentForm: { id?: string; initialPrompt?: string };
   AgentDetail: { id: string };
   AgentCloneOut: { id: string };
+};
+
+export type ReportsStackParamList = {
+  ReportsHome: undefined;
+  /** No id = create, id present = edit. */
+  ReportForm: { id?: string };
+  /** `name` is passed through only so the header has something to show
+   * immediately — mirrors `ChatConversation`'s own `title?` param. */
+  ReportLogs: { id: string; name?: string };
 };
 
 export type SettingsStackParamList = {
@@ -109,13 +161,14 @@ export type AppDrawerParamList = {
      row) — undefined lands on whichever tab react-navigation already has
      active, same as before this carried params. */
   MainTabs: NavigatorScreenParams<AppTabParamList> | undefined;
+  ChatConversationStack: NavigatorScreenParams<ChatConversationStackParamList> | undefined;
   CustomerAgents: NavigatorScreenParams<CustomerAgentsStackParamList> | undefined;
   KnowledgeBases: NavigatorScreenParams<KnowledgeBasesStackParamList> | undefined;
-  Playground: undefined;
+  Playground: NavigatorScreenParams<PlaygroundStackParamList> | undefined;
   Customers: NavigatorScreenParams<CustomersStackParamList> | undefined;
-  Leads: undefined;
-  LeadCriteria: undefined;
-  Reports: undefined;
+  Leads: NavigatorScreenParams<LeadsStackParamList> | undefined;
+  LeadCriteria: NavigatorScreenParams<LeadCriteriaStackParamList> | undefined;
+  Reports: NavigatorScreenParams<ReportsStackParamList> | undefined;
   UsageSpend: undefined;
   ApiKeys: undefined;
   Team: undefined;
