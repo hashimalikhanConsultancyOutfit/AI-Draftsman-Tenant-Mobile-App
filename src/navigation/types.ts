@@ -148,10 +148,58 @@ export type ApiKeysStackParamList = {
   PolicyView: { id: string };
 };
 
+export type TeamStackParamList = {
+  TeamHome: undefined;
+  InviteMember: undefined;
+  /** Seeded from the row that opened it — no extra fetch needed. */
+  ChangeRole: { id: string; name: string | null; email: string; roleName: string };
+};
+
+export type RolesPermissionsStackParamList = {
+  RolesHome: undefined;
+  /** No id = create, id present = edit — mirrors CustomerForm's convention. */
+  RoleForm: { id?: string };
+};
+
+export type OrganizationSettingsStackParamList = {
+  OrganizationSettingsHome: undefined;
+  CreditRateForm: undefined;
+};
+
+export type BrandingStackParamList = {
+  BrandingHome: undefined;
+  BrandForm: undefined;
+  /** Only reachable while the tenant has no domain yet — see
+   * `DomainFormScreen`'s doc comment. */
+  DomainForm: undefined;
+};
+
+export type SupportStackParamList = {
+  SupportHome: undefined;
+  TicketDetail: { id: string };
+  RaiseTicket: undefined;
+  /** `EditTicket`'s state select can itself route to escalate (choosing
+   * "with AiDraftsman") — see `supportRules.ts`'s module doc — so there
+   * is no separate "escalate" destination on this stack; escalate and
+   * bring-back are both one-tap actions on `TicketDetailScreen` itself,
+   * confirmed with `Alert.alert` rather than a pushed screen. */
+  EditTicket: { id: string };
+  ReplyTicket: { id: string };
+  NoteTicket: { id: string };
+  /** Reachable only for a full-access session — see `SUPPORT_PERMISSIONS`'s
+   * doc comment: `support.sla.manage` has no dedicated slug today. */
+  SlaPolicy: undefined;
+};
+
 export type SettingsStackParamList = {
   SettingsHome: undefined;
   Appearance: undefined;
   Account: undefined;
+  /** The three single-field edits off the Account screen (Full name,
+   * Username, Job title) share one form screen — see
+   * `AccountFieldFormScreen`'s doc comment. */
+  AccountFieldForm: { field: 'fullName' | 'username' | 'jobTitle' };
+  ChangePassword: undefined;
   UsageCredits: undefined;
   Analytics: undefined;
 };
@@ -185,10 +233,11 @@ export type AppDrawerParamList = {
   Reports: NavigatorScreenParams<ReportsStackParamList> | undefined;
   UsageSpend: undefined;
   ApiKeys: NavigatorScreenParams<ApiKeysStackParamList> | undefined;
-  Team: undefined;
-  RolesPermissions: undefined;
-  OrganizationSettings: undefined;
-  Support: undefined;
+  Team: NavigatorScreenParams<TeamStackParamList> | undefined;
+  RolesPermissions: NavigatorScreenParams<RolesPermissionsStackParamList> | undefined;
+  OrganizationSettings: NavigatorScreenParams<OrganizationSettingsStackParamList> | undefined;
+  Branding: NavigatorScreenParams<BrandingStackParamList> | undefined;
+  Support: NavigatorScreenParams<SupportStackParamList> | undefined;
 };
 
 /** Kept for the root navigator's type surface — the drawer is what actually

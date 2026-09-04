@@ -1,4 +1,6 @@
 import {
+  BILLING_PERMISSIONS,
+  BRANDING_PERMISSIONS,
   CLONE_PERMISSIONS,
   CUSTOMER_PERMISSIONS,
   DASHBOARD_PERMISSIONS,
@@ -6,7 +8,6 @@ import {
   KNOWLEDGE_BASE_PERMISSIONS,
   LEAD_CRITERIA_PERMISSIONS,
   LEAD_PERMISSIONS,
-  BILLING_PERMISSIONS,
   PLAYGROUND_PERMISSIONS,
   REPORT_PERMISSIONS,
   ROLE_PERMISSIONS,
@@ -22,8 +23,14 @@ import type { AppDrawerParamList } from './types';
  * (ai-draftsman-FE-B2B/src/config/navigation.data.ts) — same three groups,
  * same order — trimmed to the module list approved for this app: four of
  * the five bottom-tab items (Company agents, Chat, Marketplace, Settings)
- * are not repeated here, and Getting started / Branding & domain / Audit
- * log are out of scope per that approval. Dashboard IS repeated — see
+ * are not repeated here, and Getting started / Audit log remain out of
+ * scope. Branding & domain (added 2026-09-04, by explicit request) is
+ * trimmed further still — see `src/features/branding/branding.types.ts`'s
+ * module doc: web's route also shows a white-label level, a sending
+ * address, a status-page hostname and model aliases, all served by a
+ * web-only mock with no gateway-b2b backend to call from here, so this
+ * app's version covers only the brand card and the custom-domain panel,
+ * both real endpoints. Dashboard IS repeated — see
  * `DASHBOARD_SIDEBAR_ITEM` below — same as the web sidebar, which lists it
  * standalone above BUILD rather than inside a group.
  */
@@ -154,6 +161,13 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
         subtitle: 'What a credit costs you, and what you charge for one',
         icon: 'organizationSettings',
         permission: BILLING_PERMISSIONS.VIEW,
+      },
+      {
+        route: 'Branding',
+        label: 'Branding & domain',
+        subtitle: 'How the portal looks to your customers',
+        icon: 'brandingDomain',
+        permission: BRANDING_PERMISSIONS.VIEW,
       },
       {
         route: 'Support',

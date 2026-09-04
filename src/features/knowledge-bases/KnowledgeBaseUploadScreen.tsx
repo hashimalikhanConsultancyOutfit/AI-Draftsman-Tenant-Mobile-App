@@ -15,7 +15,7 @@ import type { ApiQueryError } from '@/store/baseQuery';
 import { useAppTheme } from '@/theme/ThemeContext';
 
 import type { KnowledgeBasesStackParamList } from '@/navigation/types';
-import { filenameFromLink, formatBytes, uploadContentType, validateUploadFile } from './knowledgeBaseRules';
+import { filenameFromLink, formatBytes, MAX_UPLOAD_LINKS, uploadContentType, validateUploadFile } from './knowledgeBaseRules';
 import {
   useAddKnowledgeBaseDocumentsMutation,
   useCreateKnowledgeBaseUploadIntentMutation,
@@ -291,7 +291,9 @@ export function KnowledgeBaseUploadScreen() {
                 </TouchableOpacity>
               </View>
             ))}
-            <Button label="Add another link" icon="add" variant="outline" size="sm" onPress={() => appendLink({ url: '' })} style={{ alignSelf: 'flex-start' }} />
+            {linkFields.length < MAX_UPLOAD_LINKS && (
+              <Button label="Add another link" icon="add" variant="outline" size="sm" onPress={() => appendLink({ url: '' })} style={{ alignSelf: 'flex-start' }} />
+            )}
             <Button label="Register links" onPress={handleSubmit(onSubmitLinks)} loading={isSubmitting || isRegistering} fullWidth style={{ marginTop: 14 }} />
           </Card>
         )}

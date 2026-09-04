@@ -225,6 +225,9 @@ export function ReportFormScreen() {
               <MultiSelectField label="Group by" values={value ?? []} options={GROUP_BY_OPTIONS} onChange={onChange} searchable={false} hint="Each one becomes its own section in the export, with its own total." />
             )}
           />
+          {errors.dims?.message ? (
+            <Text style={{ color: theme.colors.error, fontFamily: theme.fontFamilies.body.regular, fontSize: theme.fontSizes.xs, marginTop: -8 }}>{errors.dims.message}</Text>
+          ) : null}
           <Controller
             control={control}
             name="dest"

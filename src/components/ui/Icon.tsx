@@ -38,6 +38,7 @@ export const NAV_ICON_MAP = {
   team: 'people',
   rolesAndPermissions: 'admin-panel-settings',
   organizationSettings: 'sell',
+  brandingDomain: 'palette',
   support: 'support-agent',
 } as const satisfies Record<string, ComponentProps<typeof MaterialIcons>['name']>;
 

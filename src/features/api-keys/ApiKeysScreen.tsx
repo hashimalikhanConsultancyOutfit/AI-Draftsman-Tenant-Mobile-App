@@ -23,7 +23,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/shell/AppHeader';
-import { Button, EmptyState, ErrorState, Loader, TextField, useToast } from '@/components/ui';
+import { Button, EmptyState, ErrorState, Loader, StatusTabs, TextField, useToast } from '@/components/ui';
 import { useDebouncedValue } from '@/features/marketplace/useDebouncedValue';
 import { KEY_PERMISSIONS, KEY_POLICY_PERMISSIONS, USAGE_PERMISSIONS } from '@/permissions/slugs';
 import { usePermission } from '@/permissions/usePermission';
@@ -33,7 +33,6 @@ import { useAppTheme } from '@/theme/ThemeContext';
 import type { ApiKeysStackParamList } from '@/navigation/types';
 import { ApiKeyCard } from './components/ApiKeyCard';
 import { SecretRevealModal, type RevealedSecret } from './components/SecretRevealModal';
-import { StatusTabs } from './components/StatusTabs';
 import { useGetApiKeysQuery, useRevokeApiKeyMutation, useRotateApiKeyMutation } from './apiKeysApi';
 import {
   ANY_VALUE,

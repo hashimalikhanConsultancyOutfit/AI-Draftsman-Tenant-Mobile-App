@@ -256,6 +256,7 @@ export function KnowledgeBaseEditScreen() {
           <Text style={{ color: theme.colors.textMuted, fontFamily: theme.fontFamilies.body.regular, fontSize: 11, marginTop: 8 }}>
             One source per row. Each is saved with its own id, so editing the list does not disturb the others.
           </Text>
+          <FieldError message={(errors.sourceUrls as { message?: string } | undefined)?.message} />
         </Card>
 
         <Button label={isEdit ? 'Save changes' : 'Create'} onPress={handleSubmit(onSubmit)} loading={isSaving} fullWidth />

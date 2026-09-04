@@ -15,10 +15,10 @@ const IS_STAGING = APP_ENV === 'staging';
 
 const bundleSuffix = IS_DEV ? '.dev' : IS_STAGING ? '.staging' : '';
 const appName = IS_DEV
-  ? 'AI Draftsman (Dev)'
+  ? 'AI Draftsman B2B (Dev)'
   : IS_STAGING
-    ? 'AI Draftsman (Staging)'
-    : 'AI Draftsman';
+    ? 'AI Draftsman B2B (Staging)'
+    : 'AI Draftsman B2B';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -52,7 +52,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     bundleIdentifier: `ai.aidraftsman.tenant${bundleSuffix}`,
     infoPlist: {
       NSFaceIDUsageDescription:
-        'Use Face ID to unlock AI Draftsman quickly and securely.',
+        'Use Face ID to unlock AI Draftsman B2B quickly and securely.',
       LSApplicationQueriesSchemes: ['googleauthenticator', 'otpauth'],
     },
   },
@@ -102,7 +102,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-local-authentication',
       {
         faceIDPermission:
-          'Use Face ID to unlock AI Draftsman quickly and securely.',
+          'Use Face ID to unlock AI Draftsman B2B quickly and securely.',
       },
     ],
   ],

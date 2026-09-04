@@ -12,10 +12,15 @@ interface StatTileProps {
    * £5.00 cap" on Spend this month. Omit for tiles with no cap concept. */
   progressPct?: number;
   warning?: boolean;
+  /** Colours the VALUE itself (not just the caption) green/red — for a
+   * figure that is itself a signed result, like a margin. Omit for a tile
+   * whose value is a plain count or amount with no sign to call out. */
+  valueTone?: 'positive' | 'negative' | null;
 }
 
-export function StatTile({ label, value, caption, icon, progressPct, warning }: StatTileProps) {
+export function StatTile({ label, value, caption, icon, progressPct, warning, valueTone }: StatTileProps) {
   const { theme } = useAppTheme();
+  const valueColor = valueTone === 'positive' ? theme.colors.statusSuccessFg : valueTone === 'negative' ? theme.colors.statusErrorFg : theme.colors.text;
 
   return (
     <Card style={styles.card}>
@@ -25,7 +30,7 @@ export function StatTile({ label, value, caption, icon, progressPct, warning }: 
           <Icon name={icon} size={16} color={theme.colors.accent} />
         </View>
       </View>
-      <Text style={[styles.value, { color: theme.colors.text, fontFamily: theme.fontFamilies.display.bold }]}>{value}</Text>
+      <Text style={[styles.value, { color: valueColor, fontFamily: theme.fontFamilies.display.bold }]}>{value}</Text>
       {caption && (
         <Text style={[styles.caption, { color: warning ? theme.colors.warning : theme.colors.textMuted }]}>{caption}</Text>
       )}

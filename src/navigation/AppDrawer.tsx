@@ -1,22 +1,23 @@
 import { createDrawerNavigator } from '@react-navigation/drawer';
 
-import { OrganizationSettingsScreen } from '@/features/organization-settings/OrganizationSettingsScreen';
-import { RolesPermissionsScreen } from '@/features/roles/RolesPermissionsScreen';
-import { SupportScreen } from '@/features/support/SupportScreen';
-import { TeamScreen } from '@/features/team/TeamScreen';
 import { UsageSpendScreen } from '@/features/usage-spend/UsageSpendScreen';
 
 import { AppTabs } from './AppTabs';
 import { SidebarContent } from './SidebarContent';
 import { ApiKeysStack } from './stacks/ApiKeysStack';
+import { BrandingStack } from './stacks/BrandingStack';
 import { ChatConversationStack } from './stacks/ChatConversationStack';
 import { CustomerAgentsStack } from './stacks/CustomerAgentsStack';
 import { CustomersStack } from './stacks/CustomersStack';
 import { KnowledgeBasesStack } from './stacks/KnowledgeBasesStack';
 import { LeadCriteriaStack } from './stacks/LeadCriteriaStack';
+import { OrganizationSettingsStack } from './stacks/OrganizationSettingsStack';
 import { LeadsStack } from './stacks/LeadsStack';
 import { PlaygroundStack } from './stacks/PlaygroundStack';
 import { ReportsStack } from './stacks/ReportsStack';
+import { RolesPermissionsStack } from './stacks/RolesPermissionsStack';
+import { SupportStack } from './stacks/SupportStack';
+import { TeamStack } from './stacks/TeamStack';
 import type { AppDrawerParamList } from './types';
 
 const Drawer = createDrawerNavigator<AppDrawerParamList>();
@@ -47,10 +48,11 @@ export function AppDrawer() {
       <Drawer.Screen name="Reports" component={ReportsStack} />
       <Drawer.Screen name="UsageSpend" component={UsageSpendScreen} />
       <Drawer.Screen name="ApiKeys" component={ApiKeysStack} />
-      <Drawer.Screen name="Team" component={TeamScreen} />
-      <Drawer.Screen name="RolesPermissions" component={RolesPermissionsScreen} />
-      <Drawer.Screen name="OrganizationSettings" component={OrganizationSettingsScreen} />
-      <Drawer.Screen name="Support" component={SupportScreen} />
+      <Drawer.Screen name="Team" component={TeamStack} />
+      <Drawer.Screen name="RolesPermissions" component={RolesPermissionsStack} />
+      <Drawer.Screen name="Branding" component={BrandingStack} />
+      <Drawer.Screen name="OrganizationSettings" component={OrganizationSettingsStack} />
+      <Drawer.Screen name="Support" component={SupportStack} />
     </Drawer.Navigator>
   );
 }

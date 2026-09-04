@@ -14,7 +14,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/shell/AppHeader';
-import { Button, EmptyState, ErrorState, Loader, TextField, useToast } from '@/components/ui';
+import { Button, EmptyState, ErrorState, Loader, StatusTabs, TextField, useToast } from '@/components/ui';
 import { useDebouncedValue } from '@/features/marketplace/useDebouncedValue';
 import { KEY_POLICY_PERMISSIONS, USAGE_PERMISSIONS } from '@/permissions/slugs';
 import { usePermission } from '@/permissions/usePermission';
@@ -23,7 +23,6 @@ import { useAppTheme } from '@/theme/ThemeContext';
 
 import type { ApiKeysStackParamList } from '@/navigation/types';
 import { PolicyCard } from './components/PolicyCard';
-import { StatusTabs } from './components/StatusTabs';
 import { useDeleteKeyPolicyMutation, useGetKeyPoliciesQuery } from './apiKeysApi';
 import { ANY_VALUE, NO_CREATE_POLICY_DESCRIPTION, NO_PERMISSION_MESSAGE, POLICY_SCOPE_TABS, POLICY_TRAINING_TABS, SEARCH_DEBOUNCE_MS, buildDeletePolicyWarning, buildLimitsLabel } from './apiKeysRules';
 import type { KeyPolicy, KeyScopeType } from './apiKeys.types';

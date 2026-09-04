@@ -10,8 +10,13 @@ import { useAppTheme } from '@/theme/ThemeContext';
 
 import type { SettingsStackParamList } from '@/navigation/types';
 
+/* Only the routes reachable directly from this list — i.e. the ones with
+ * no required params. `AccountFieldForm` needs a `field` and is reached
+ * only from inside `AccountScreen`, never from here. */
+type SettingsHomeRoute = 'Account' | 'Appearance' | 'UsageCredits' | 'Analytics';
+
 interface Row {
-  route: keyof SettingsStackParamList;
+  route: SettingsHomeRoute;
   label: string;
   sublabel: string;
   icon: IconName;
@@ -21,7 +26,7 @@ const ROWS: Row[] = [
   { route: 'Account', label: 'Account', sublabel: 'Profile, password, two-factor', icon: 'person-outline' },
   { route: 'Appearance', label: 'Appearance', sublabel: 'Light, dark or system, density, text size', icon: 'palette' },
   { route: 'UsageCredits', label: 'Usage and credits', sublabel: 'Your wallet, cap and this period’s spend', icon: 'account-balance-wallet' },
-  { route: 'Analytics', label: 'Analytics', sublabel: 'How this workspace is being used', icon: 'insights' },
+  { route: 'Analytics', label: 'Analytics', sublabel: 'Where consumption went over the last 7, 30 or 90 days', icon: 'insights' },
 ];
 
 export function SettingsScreen() {

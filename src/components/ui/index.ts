@@ -7,6 +7,7 @@ export { Loader } from './Loader';
 export { MultiSelectField } from './MultiSelectField';
 export { OtpInput } from './OtpInput';
 export { PickerField, type PickerOption } from './PickerField';
+export { StatusTabs } from './StatusTabs';
 export { Switch } from './Switch';
 export { TextField } from './TextField';
 export { ToastProvider, useToast } from './Toast';

@@ -139,7 +139,14 @@ export async function apiRequest<T>(
     ...options.headers,
   };
 
-  if (options.body !== undefined) {
+  /* A multipart body (a logo upload, so far — see `branding` feature)
+   * must NOT get a hand-set `Content-Type`: RN's `fetch` derives one from
+   * the `FormData` itself, including the multipart boundary, and
+   * overriding it here produces a boundary-less header the server reads
+   * as malformed. Every other caller still passes a plain object and is
+   * unaffected — this is a new branch, not a changed one. */
+  const isFormData = options.body instanceof FormData;
+  if (options.body !== undefined && !isFormData) {
     headers['Content-Type'] = 'application/json';
   }
 
@@ -153,7 +160,7 @@ export async function apiRequest<T>(
     response = await fetch(url, {
       method: options.method ?? 'GET',
       headers,
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      body: options.body === undefined ? undefined : isFormData ? (options.body as FormData) : JSON.stringify(options.body),
       signal: options.signal,
     });
   } catch (cause) {

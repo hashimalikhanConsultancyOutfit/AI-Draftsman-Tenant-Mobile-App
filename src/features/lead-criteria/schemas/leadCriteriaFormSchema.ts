@@ -1,6 +1,6 @@
 import * as yup from 'yup';
 
-import type { LeadCriteriaSet } from '../leadCriteria.types';
+import { LEAD_FUNDING_STAGES, LEAD_SENIORITIES, type LeadCriteriaSet, type LeadFundingStage, type LeadSeniority } from '../leadCriteria.types';
 
 /**
  * Create + Edit lead-criteria set — one shared schema/value shape, ported
@@ -57,7 +57,7 @@ export const leadCriteriaSchema = yup.object({
   revenueCurrency: yup.string().trim().transform((v) => (typeof v === 'string' ? v.toUpperCase() : v)).required('Currency is required').matches(REVENUE_CURRENCY_PATTERN, 'Use a 3-letter ISO code, e.g. GBP').default('GBP'),
 
   jobTitles: stringArray(),
-  seniorities: yup.array().of(yup.string().required()).default([]),
+  seniorities: yup.array().of(yup.mixed<LeadSeniority>().oneOf(LEAD_SENIORITIES).required()).default([]),
   departments: stringArray(),
 
   includeKeywords: stringArray(),
@@ -65,7 +65,7 @@ export const leadCriteriaSchema = yup.object({
   excludeDomains: stringArray(),
   technologies: stringArray(),
 
-  fundingStages: yup.array().of(yup.string().required()).default([]),
+  fundingStages: yup.array().of(yup.mixed<LeadFundingStage>().oneOf(LEAD_FUNDING_STAGES).required()).default([]),
   hiringSignal: yup.boolean().default(false),
   recentFundingWithinDays: nonNegativeInt('Recent funding window'),
   sources: stringArray(),

@@ -44,7 +44,7 @@ export function ResetPasswordScreen({ route, navigation }: Props) {
   };
 
   return (
-    <AuthScreenLayout eyebrow="Reset password" title="Choose a new password" subtitle="Your new password must be at least 8 characters.">
+    <AuthScreenLayout eyebrow="Reset password" title="Choose a new password" subtitle="At least 8 characters, with one capital letter, one number, and one special character.">
       <Controller
         control={control}
         name="password"

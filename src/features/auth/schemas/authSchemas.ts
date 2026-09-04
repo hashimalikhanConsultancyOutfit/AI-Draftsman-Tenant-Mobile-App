@@ -1,5 +1,7 @@
 import * as yup from 'yup';
 
+import { meetsPolicy, PASSWORD_POLICY_MESSAGE } from '../passwordPolicy';
+
 /** Mirrors the backend DTOs' validation shape (email format, required
  * password) — see submit-credentials.dto.ts. The backend is still the real
  * enforcement; this only avoids a round-trip for the obviously-empty case. */
@@ -16,9 +18,17 @@ export const forgotPasswordSchema = yup.object({
 
 export type ForgotPasswordFormValues = yup.InferType<typeof forgotPasswordSchema>;
 
-/** Backend requires min 8 chars on POST /auth/reset-password/:token. */
+/** Backend enforces only an 8-char floor on POST /auth/reset-password/:token,
+ * but web's own reset form gates on the full four-rule policy (length,
+ * uppercase, digit, special character) and deliberately does not let the
+ * server's weaker floor decide — see `passwordPolicy.ts`. Matching that here
+ * so the same account can't end up with a weaker password depending on
+ * which client reset it. */
 export const resetPasswordSchema = yup.object({
-  password: yup.string().min(8, 'Must be at least 8 characters').required('Password is required'),
+  password: yup
+    .string()
+    .required('Password is required')
+    .test('policy', PASSWORD_POLICY_MESSAGE, (value) => meetsPolicy(value ?? '')),
   confirmPassword: yup
     .string()
     .oneOf([yup.ref('password')], 'Passwords do not match')

@@ -241,4 +241,19 @@ export const parseIpAllowlist = (text: string): string[] =>
     .map((s) => s.trim())
     .filter(Boolean);
 
-export const IPV4_CIDR_SHAPE = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(\/\d{1,2})?$/;
+/** Backend caps the allow-list at 100 entries (`@ArrayMaxSize(100)` on
+ * `CreateKeyPolicyDto.ipAllowlist`). */
+export const MAX_IP_ALLOWLIST_ENTRIES = 100;
+
+/** Per-octet 0-255, prefix 0-32 — a real range check, not just a digit
+ * count. The original version of this regex (`\d{1,3}...(\/\d{1,2})?`)
+ * validated digit COUNT only, so `999.999.999.999/99` and a leading-zero
+ * octet like `010.0.0.1` both passed here and were then rejected by the
+ * server's real parser (`libs/b2b-shared/src/utils/cidr.ts`, `isValidCidr`)
+ * — a client check that accepts what the server rejects is worse than no
+ * check at all, since it tells the user their entry was fine right up
+ * until the 400 comes back. A regex literal, not a built-up string, so the
+ * octet's backslash-escapes can't get silently swallowed by JS string
+ * escaping rules the way an intermediate string constant's would. */
+export const IPV4_CIDR_SHAPE =
+  /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}(\/(3[0-2]|[12]?\d))?$/;

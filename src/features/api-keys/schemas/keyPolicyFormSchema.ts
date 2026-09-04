@@ -1,6 +1,6 @@
 import * as yup from 'yup';
 
-import { IPV4_CIDR_SHAPE, parseIpAllowlist } from '../apiKeysRules';
+import { IPV4_CIDR_SHAPE, MAX_IP_ALLOWLIST_ENTRIES, parseIpAllowlist } from '../apiKeysRules';
 
 /**
  * Mirrors `CreateKeyPolicyDto`/`UpdateKeyPolicyDto` exactly on bounds
@@ -37,6 +37,10 @@ export const keyPolicyFormSchema = yup.object({
     .test('cidr-shape', 'Use comma-separated CIDR ranges, e.g. 203.0.113.0/24. Leave empty to allow any address.', (v) => {
       if (!v || !v.trim()) return true;
       return parseIpAllowlist(v).every((entry) => IPV4_CIDR_SHAPE.test(entry));
+    })
+    .test('cidr-count', `Enter at most ${MAX_IP_ALLOWLIST_ENTRIES} addresses.`, (v) => {
+      if (!v || !v.trim()) return true;
+      return parseIpAllowlist(v).length <= MAX_IP_ALLOWLIST_ENTRIES;
     }),
   allowTraining: yup.boolean().required(),
   isDefault: yup.boolean().required(),

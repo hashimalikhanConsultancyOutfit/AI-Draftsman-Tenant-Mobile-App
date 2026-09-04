@@ -89,6 +89,13 @@ export const buildDocumentDeleteWarning = (document: KnowledgeBaseDocument): str
 /* Upload validation — mirrors web's upload.ts, minus archive extraction     */
 /* -------------------------------------------------------------------------- */
 
+/** Web's "Add links" tab disables its own "Add another link" button once the
+ * list reaches 25 rows (`UploadDocumentsModal.tsx`) — the backend itself has
+ * no matching cap (`AddDocumentsDto.documents` has no `@ArrayMaxSize`), but
+ * mobile's link form had no cap at all, so a very large paste-driven list
+ * could grow well past what web ever lets a user build in one batch. */
+export const MAX_UPLOAD_LINKS = 25;
+
 export const MAX_KB_UPLOAD_BYTES = 15 * 1024 * 1024;
 
 export const KB_UPLOAD_MIME_TYPES = new Set([
