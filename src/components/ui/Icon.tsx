@@ -19,11 +19,18 @@ import { useAppTheme } from '@/theme/ThemeContext';
  * shipping the Material Symbols Rounded variable font instead — noted as a
  * deliberate, disclosed tradeoff rather than silently shipping an
  * approximation; revisit if design flags it in QA.
+ *
+ * `chat` is a deliberate additional deviation from that parity note: web
+ * uses the outline bubble (ChatBubbleOutlineRounded), but in this app's
+ * bottom tab bar every other icon (home, smart-toy, extension, settings) is
+ * a solid/filled glyph, so the outline bubble was the one visually
+ * "lighter" icon among five otherwise-filled ones — swapped to the filled
+ * `chat-bubble` to read as the same weight as its neighbours.
  */
 export const NAV_ICON_MAP = {
   dashboard: 'home',
   companyAgents: 'smart-toy',
-  chat: 'chat-bubble-outline',
+  chat: 'chat-bubble',
   marketplace: 'extension',
   settings: 'settings',
   customerAgents: 'groups',

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, StyleSheet, View } from 'react-native';
 
+import { BrandLogo } from '@/components/brand/BrandLogo';
 import { useAppTheme } from '@/theme/ThemeContext';
 
 /**
@@ -54,27 +55,7 @@ export function BrandSplash({ visible }: { visible: boolean }) {
       style={[styles.container, { backgroundColor: theme.colors.background, opacity }]}
     >
       <Animated.View style={{ transform: [{ scale }], alignItems: 'center' }}>
-        <View style={[styles.mark, { backgroundColor: theme.colors.accent, borderRadius: theme.radii.xl }]}>
-          <Text style={[styles.markLetter, { fontFamily: theme.fontFamilies.display.bold, color: theme.colors.textOnAccent }]}>
-            A
-          </Text>
-        </View>
-        <Text
-          style={[
-            styles.wordmark,
-            { color: theme.colors.text, fontFamily: theme.fontFamilies.display.semibold, fontSize: theme.fontSizes.xl },
-          ]}
-        >
-          AI Draftsman
-        </Text>
-        <Text
-          style={[
-            styles.tagline,
-            { color: theme.colors.textMuted, fontFamily: theme.fontFamilies.body.regular, fontSize: theme.fontSizes.sm },
-          ]}
-        >
-          Tenant Portal
-        </Text>
+        <BrandLogo width={180} style={styles.logo} />
       </Animated.View>
 
       <View style={[styles.trackWrapper, { bottom: 64 }]}>
@@ -106,16 +87,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 999,
   },
-  mark: {
-    width: 72,
-    height: 72,
-    alignItems: 'center',
-    justifyContent: 'center',
+  logo: {
     marginBottom: 16,
   },
-  markLetter: { fontSize: 34 },
-  wordmark: { letterSpacing: 0.3 },
-  tagline: { marginTop: 2, letterSpacing: 1.5, textTransform: 'uppercase' },
   trackWrapper: { position: 'absolute', width: 96 },
   track: { width: 96, height: 3, overflow: 'hidden' },
   trackFill: { width: 40, height: 3 },

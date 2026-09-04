@@ -17,7 +17,7 @@ import { BrandSplash } from './BrandSplash';
 // before we're ready.
 void SplashScreen.preventAutoHideAsync();
 
-const MINIMUM_SPLASH_MS = 700;
+const MINIMUM_SPLASH_MS = 4000;
 
 /**
  * Orchestrates cold start: keeps the native launch frame up, loads the

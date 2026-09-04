@@ -14,11 +14,11 @@ const IS_DEV = APP_ENV === 'development';
 const IS_STAGING = APP_ENV === 'staging';
 
 const bundleSuffix = IS_DEV ? '.dev' : IS_STAGING ? '.staging' : '';
-const appName = IS_DEV
-  ? 'AI Draftsman B2B (Dev)'
-  : IS_STAGING
-    ? 'AI Draftsman B2B (Staging)'
-    : 'AI Draftsman B2B';
+// Always the same visible app name regardless of environment — the bundle
+// identifier / package suffix above is what actually keeps dev, staging,
+// and production installable side by side on one device; the name itself
+// no longer carries an "(Dev)"/"(Staging)" suffix per request.
+const appName = 'AI Draftsman B2B';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,

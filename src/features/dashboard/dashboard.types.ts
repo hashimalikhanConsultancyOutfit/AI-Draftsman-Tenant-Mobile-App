@@ -70,7 +70,3 @@ export interface LimitsResponse {
   hardStop: boolean;
   currency: string;
 }
-
-export interface UnreadCountResponse {
-  unread: number;
-}

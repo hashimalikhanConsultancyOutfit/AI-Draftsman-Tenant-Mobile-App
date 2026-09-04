@@ -232,6 +232,7 @@ export type AppDrawerParamList = {
   LeadCriteria: NavigatorScreenParams<LeadCriteriaStackParamList> | undefined;
   Reports: NavigatorScreenParams<ReportsStackParamList> | undefined;
   UsageSpend: undefined;
+  Notifications: undefined;
   ApiKeys: NavigatorScreenParams<ApiKeysStackParamList> | undefined;
   Team: NavigatorScreenParams<TeamStackParamList> | undefined;
   RolesPermissions: NavigatorScreenParams<RolesPermissionsStackParamList> | undefined;

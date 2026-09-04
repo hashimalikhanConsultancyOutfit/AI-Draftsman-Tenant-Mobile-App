@@ -1,5 +1,6 @@
 import { createDrawerNavigator } from '@react-navigation/drawer';
 
+import { NotificationsScreen } from '@/features/notifications/NotificationsScreen';
 import { UsageSpendScreen } from '@/features/usage-spend/UsageSpendScreen';
 
 import { AppTabs } from './AppTabs';
@@ -47,6 +48,7 @@ export function AppDrawer() {
       <Drawer.Screen name="LeadCriteria" component={LeadCriteriaStack} />
       <Drawer.Screen name="Reports" component={ReportsStack} />
       <Drawer.Screen name="UsageSpend" component={UsageSpendScreen} />
+      <Drawer.Screen name="Notifications" component={NotificationsScreen} />
       <Drawer.Screen name="ApiKeys" component={ApiKeysStack} />
       <Drawer.Screen name="Team" component={TeamStack} />
       <Drawer.Screen name="RolesPermissions" component={RolesPermissionsStack} />

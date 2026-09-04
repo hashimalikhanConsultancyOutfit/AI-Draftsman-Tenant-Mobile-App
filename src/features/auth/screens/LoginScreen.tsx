@@ -1,13 +1,14 @@
 import { yupResolver } from '@hookform/resolvers/yup';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { Text, TouchableOpacity, View } from 'react-native';
 
-import { Button, TextField } from '@/components/ui';
+import { Button, Checkbox, TextField } from '@/components/ui';
 import type { AuthStackParamList } from '@/navigation/types';
 import { getErrorMessage } from '@/services/apiErrorMessage';
+import { clearRememberedEmail, loadRememberedEmail, saveRememberedEmail } from '@/services/rememberedEmail';
 import { useSubmitCredentialsMutation } from '@/store/authApi';
 import { useAppTheme } from '@/theme/ThemeContext';
 
@@ -18,18 +19,34 @@ export function LoginScreen() {
   const { theme } = useAppTheme();
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>();
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [submitCredentials, { isLoading, error }] = useSubmitCredentialsMutation();
 
   const {
     control,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<LoginFormValues>({
     resolver: yupResolver(loginSchema),
     defaultValues: { email: '', password: '' },
   });
 
+  // Pre-fill the email (never the password) from a previous "Remember me"
+  // sign-in — including one that ended in a sign-out, since logout only
+  // clears the session cookie/snapshot, never this remembered value.
+  useEffect(() => {
+    void (async () => {
+      const savedEmail = await loadRememberedEmail();
+      if (savedEmail) {
+        setValue('email', savedEmail);
+        setRememberMe(true);
+      }
+    })();
+  }, [setValue]);
+
   const onSubmit = async (values: LoginFormValues) => {
+    await (rememberMe ? saveRememberedEmail(values.email) : clearRememberedEmail());
     // Navigation on success is driven entirely by the auth phase change in
     // RootNavigator (submitCredentials's onQueryStarted dispatches
     // credentialsAccepted / credentialsRequireEnrolment / accountRefused,
@@ -39,26 +56,9 @@ export function LoginScreen() {
 
   return (
     <AuthScreenLayout
-      eyebrow="AI Draftsman"
+      logo
       title="Welcome back"
       subtitle="Sign in to your workspace's tenant portal."
-      footer={
-        <TouchableOpacity
-          onPress={() => navigation.navigate('ForgotPassword')}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text
-            style={{
-              color: theme.colors.accent,
-              fontFamily: theme.fontFamilies.body.semibold,
-              fontSize: theme.fontSizes.sm,
-              textAlign: 'center',
-            }}
-          >
-            Forgot your password?
-          </Text>
-        </TouchableOpacity>
-      }
     >
       <Controller
         control={control}
@@ -105,6 +105,25 @@ export function LoginScreen() {
           />
         )}
       />
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Checkbox label="Remember me" checked={rememberMe} onChange={setRememberMe} />
+
+        <TouchableOpacity
+          onPress={() => navigation.navigate('ForgotPassword')}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text
+            style={{
+              color: theme.colors.accent,
+              fontFamily: theme.fontFamilies.body.semibold,
+              fontSize: theme.fontSizes.sm,
+            }}
+          >
+            Forgot your password?
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {error && (
         <Text

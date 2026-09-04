@@ -84,7 +84,7 @@ export function ChatScreen() {
   if (!canView) {
     return (
       <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-        <AppHeader title="Chat" mode="tab" onMenuPress={() => navigation.dispatch(DrawerActions.openDrawer())} />
+        <AppHeader title="Chat" mode="tab" onMenuPress={() => navigation.dispatch(DrawerActions.openDrawer())} onBellPress={() => navigation.getParent()?.getParent()?.navigate('Notifications' as never)} />
         <EmptyState icon="lock" title={NO_ACCESS_TITLE} description={NO_ACCESS_BODY} />
       </View>
     );
@@ -256,7 +256,7 @@ export function ChatScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <AppHeader title="Chat" mode="tab" onMenuPress={() => navigation.dispatch(DrawerActions.openDrawer())} />
+      <AppHeader title="Chat" mode="tab" onMenuPress={() => navigation.dispatch(DrawerActions.openDrawer())} onBellPress={() => navigation.getParent()?.getParent()?.navigate('Notifications' as never)} />
 
       <FlatList
         data={groups}

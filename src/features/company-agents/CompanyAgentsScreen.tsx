@@ -75,6 +75,7 @@ export function CompanyAgentsScreen() {
         mode="tab"
         onMenuPress={() => navigation.dispatch(DrawerActions.openDrawer())}
         onAvatarPress={() => navigation.getParent()?.navigate('SettingsTab' as never)}
+        onBellPress={() => navigation.getParent()?.getParent()?.navigate('Notifications' as never)}
       />
 
       {isLoading ? (

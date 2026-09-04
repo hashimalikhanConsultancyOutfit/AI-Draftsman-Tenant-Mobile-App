@@ -2,7 +2,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, Text, TouchableOpacity, View, type ViewStyle } from 'react-native';
 
 import { Icon } from '@/components/ui';
-import { useGetUnreadNotificationCountQuery } from '@/features/dashboard/dashboardApi';
+import { useGetUnreadNotificationCountQuery } from '@/features/notifications/notificationsApi';
 import { useAppSelector } from '@/store/hooks';
 import { useAppTheme } from '@/theme/ThemeContext';
 

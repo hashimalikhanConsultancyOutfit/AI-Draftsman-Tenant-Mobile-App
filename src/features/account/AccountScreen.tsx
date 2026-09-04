@@ -24,7 +24,7 @@
  */
 
 import { useState } from 'react';
-import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -106,6 +106,25 @@ export function AccountScreen() {
     } catch (err) {
       toast.show(getErrorMessage(err as never, AVATAR_REMOVE_ERROR), { tone: 'error' });
     }
+  };
+
+  // No backend endpoint for this yet — confirming just surfaces that,
+  // rather than silently doing nothing or pretending to delete anything.
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete account?',
+      'This will permanently delete your account and all of its data. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            toast.show('Account deletion is not available yet. Contact support to delete your account.', { tone: 'warning' });
+          },
+        },
+      ],
+    );
   };
 
   if (isLoading) {
@@ -230,6 +249,21 @@ export function AccountScreen() {
             </View>
             <Button label="Sign out" size="sm" variant="outline" icon="logout" onPress={() => logout()} loading={isSigningOut} />
           </View>
+        </Card>
+
+        {/* --- Danger zone ---------------------------------------------------
+            UI only for now, per request — no delete-account endpoint exists
+            yet, so confirming tells the person that rather than calling
+            anything or pretending to have deleted the account. */}
+        <SectionTitle theme={theme} title="Danger zone" />
+        <Card style={[styles.section, { borderWidth: theme.borders.hairline, borderColor: theme.colors.error }]}>
+          <View style={{ gap: 4, paddingBottom: 12 }}>
+            <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.body.semibold, fontSize: theme.fontSizes.sm }}>Delete account</Text>
+            <Text style={{ color: theme.colors.textMuted, fontFamily: theme.fontFamilies.body.regular, fontSize: 12 }}>
+              Permanently delete your account and all of its data. This cannot be undone.
+            </Text>
+          </View>
+          <Button label="Delete account" variant="danger" icon="delete" onPress={handleDeleteAccount} />
         </Card>
       </ScrollView>
     </View>

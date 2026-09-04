@@ -44,6 +44,7 @@ export function MarketplaceScreen() {
         mode="tab"
         onMenuPress={() => navigation.dispatch(DrawerActions.openDrawer())}
         onAvatarPress={() => navigation.getParent()?.navigate('MainTabs', { screen: 'SettingsTab' } as never)}
+        onBellPress={() => navigation.getParent()?.getParent()?.navigate('Notifications' as never)}
       />
 
       <View style={styles.subtitleBlock}>

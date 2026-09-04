@@ -1,10 +1,10 @@
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { DrawerActions, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/shell/AppHeader';
-import { Icon, type IconName } from '@/components/ui';
+import { Icon, useToast, type IconName } from '@/components/ui';
 import { useAppSelector } from '@/store/hooks';
 import { useAppTheme } from '@/theme/ThemeContext';
 
@@ -29,11 +29,34 @@ const ROWS: Row[] = [
   { route: 'Analytics', label: 'Analytics', sublabel: 'Where consumption went over the last 7, 30 or 90 days', icon: 'insights' },
 ];
 
+interface LegalRow {
+  key: string;
+  label: string;
+  icon: IconName;
+  /** Left blank until the real links are supplied — a tap shows a toast
+   * instead of opening anything until these are filled in. */
+  url: string;
+}
+
+const LEGAL_ROWS: LegalRow[] = [
+  { key: 'terms', label: 'Terms and Conditions', icon: 'gavel', url: '' },
+  { key: 'privacy', label: 'Privacy Policy', icon: 'privacy-tip', url: '' },
+];
+
 export function SettingsScreen() {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<SettingsStackParamList>>();
   const session = useAppSelector((s) => s.auth.session);
+  const toast = useToast();
+
+  const handleLegalRowPress = (row: LegalRow) => {
+    if (!row.url) {
+      toast.show(`${row.label} link is coming soon.`, { tone: 'neutral' });
+      return;
+    }
+    Linking.openURL(row.url).catch(() => toast.show(`Could not open ${row.label}.`, { tone: 'error' }));
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
@@ -41,6 +64,7 @@ export function SettingsScreen() {
         title="Settings"
         mode="tab"
         onMenuPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+        onBellPress={() => navigation.getParent()?.getParent()?.navigate('Notifications' as never)}
       />
       <ScrollView contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 24 }]}>
         {session && (
@@ -90,6 +114,31 @@ export function SettingsScreen() {
                 </Text>
               </View>
               <Icon name="chevron-right" size={22} color={theme.colors.textMuted} />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={[styles.section, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.xl }]}>
+          {LEGAL_ROWS.map((row, i) => (
+            <TouchableOpacity
+              key={row.key}
+              onPress={() => handleLegalRowPress(row)}
+              style={[
+                styles.row,
+                i < LEGAL_ROWS.length - 1 && { borderBottomWidth: theme.borders.hairline, borderBottomColor: theme.colors.border },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={row.label}
+            >
+              <View style={[styles.rowIcon, { backgroundColor: theme.colors.statusNeutralBg, borderRadius: theme.radii.md }]}>
+                <Icon name={row.icon} size={20} color={theme.colors.text} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.body.medium, fontSize: theme.fontSizes.md }}>
+                  {row.label}
+                </Text>
+              </View>
+              <Icon name="open-in-new" size={18} color={theme.colors.textMuted} />
             </TouchableOpacity>
           ))}
         </View>

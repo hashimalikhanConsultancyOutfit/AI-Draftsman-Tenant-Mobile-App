@@ -1,5 +1,6 @@
 export { Button } from './Button';
 export { Card } from './Card';
+export { Checkbox } from './Checkbox';
 export { EmptyState } from './EmptyState';
 export { ErrorState } from './ErrorState';
 export { Icon, NAV_ICON_MAP, type IconName, type NavIconKey } from './Icon';

@@ -4,7 +4,6 @@ import type {
   CustomerStatsResponse,
   DashboardResponse,
   LimitsResponse,
-  UnreadCountResponse,
 } from './dashboard.types';
 
 /**
@@ -32,10 +31,6 @@ export const dashboardApi = api.injectEndpoints({
       query: () => ({ url: '/limits', method: 'GET' }),
       providesTags: ['Limits'],
     }),
-    getUnreadNotificationCount: builder.query<UnreadCountResponse, void>({
-      query: () => ({ url: '/notifications/unread-count', method: 'GET' }),
-      providesTags: ['Notifications'],
-    }),
   }),
 });
 
@@ -43,5 +38,4 @@ export const {
   useGetDashboardQuery,
   useGetCustomerStatsQuery,
   useGetLimitsQuery,
-  useGetUnreadNotificationCountQuery,
 } = dashboardApi;
