@@ -24,7 +24,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: appName,
   slug: 'ai-draftsman-tenant-mobile',
-  version: '0.1.0',
+  version: '1.0.0',
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'automatic', // driven by our own ThemeProvider, not the OS switch alone
@@ -37,19 +37,33 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // We render our own animated JS splash screen (see src/app/SplashGate.tsx).
   // The native splash below is only the instant-launch frame shown before JS boots.
   splash: {
-    image: './assets/splash-icon.png',
+    /*
+     * The same wordmark the JS splash and the sign-in header show, so the
+     * native frame and the animated one are the same picture and the handover
+     * is invisible. Each theme takes the artwork drawn for it: the dark-ink
+     * lockup on the light ground, the white lockup on the dark ground.
+     */
+    image: './assets/splash-logo-light-theme.png',
     resizeMode: 'contain',
     backgroundColor: '#F4F2EE',
     dark: {
-      image: './assets/splash-icon.png',
+      image: './assets/splash-logo-dark-theme.png',
       resizeMode: 'contain',
       backgroundColor: '#1C1A16',
     },
   },
 
   ios: {
-    supportsTablet: true,
+    /*
+     * iPhone only. The UI is a phone layout throughout — a five-tab bottom bar,
+     * single-column stacks, cards sized to a phone's width — and none of it has
+     * been designed or tested against an iPad's canvas. Declaring tablet support
+     * would ship a stretched phone app AND oblige us to supply iPad screenshots
+     * that misrepresent it. Flip this back on only alongside real iPad layouts.
+     */
+    supportsTablet: false,
     bundleIdentifier: `ai.aidraftsman.tenant${bundleSuffix}`,
+    buildNumber: '3',
     infoPlist: {
       NSFaceIDUsageDescription:
         'Use Face ID to unlock AI Draftsman B2B quickly and securely.',
@@ -66,7 +80,25 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       monochromeImage: './assets/android-icon-monochrome.png',
     },
     predictiveBackGestureEnabled: false,
+    /* Play reads the manifest, not our intentions: an explicit versionCode here
+       (appVersionSource is "local") means a bump is a reviewed source change
+       rather than something EAS infers. */
+    versionCode: 1,
     permissions: ['USE_BIOMETRIC', 'USE_FINGERPRINT'],
+    /*
+     * Permissions expo-image-picker's plugin adds by default for capabilities we
+     * never use. RECORD_AUDIO comes with its video-capture path, SYSTEM_ALERT_WINDOW
+     * and WRITE_EXTERNAL_STORAGE are legacy defaults. All three are dead weight, and
+     * a declared microphone permission with no feature behind it contradicts the
+     * Data safety declaration (no audio collected) — which is exactly the kind of
+     * mismatch Play flags. READ_EXTERNAL_STORAGE stays: the picker still needs it
+     * for gallery access on API 32 and below.
+     */
+    blockedPermissions: [
+      'android.permission.RECORD_AUDIO',
+      'android.permission.SYSTEM_ALERT_WINDOW',
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+    ],
     intentFilters: [
       {
         action: 'VIEW',
@@ -90,12 +122,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'expo-splash-screen',
       {
         backgroundColor: '#F4F2EE',
-        image: './assets/splash-icon.png',
+        image: './assets/splash-logo-light-theme.png',
         dark: {
           backgroundColor: '#1C1A16',
-          image: './assets/splash-icon.png',
+          image: './assets/splash-logo-dark-theme.png',
         },
-        imageWidth: 160,
+        /* Matches BrandLogo's width in BrandSplash, so the wordmark does not
+           jump size when the JS splash takes over from the native frame. */
+        imageWidth: 180,
       },
     ],
     [
@@ -110,7 +144,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   extra: {
     appEnv: APP_ENV,
     eas: {
-      // filled in when EAS project is created
+      projectId: 'c237be2a-2e1b-4544-9184-3d7db85e95d9',
     },
   },
 });
