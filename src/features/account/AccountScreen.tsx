@@ -33,6 +33,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppHeader } from '@/components/shell/AppHeader';
 import { Button, Card, ErrorState, Icon, Loader, useToast } from '@/components/ui';
 import { getErrorMessage } from '@/services/apiErrorMessage';
+import { useDeleteTenantMutation } from '@/features/tenant/tenantApi';
 import { useLogoutMutation } from '@/store/authApi';
 import { useAppTheme, type AppTheme } from '@/theme/ThemeContext';
 
@@ -67,6 +68,7 @@ export function AccountScreen() {
   const [uploadAvatar, { isLoading: isUploading }] = useUploadAvatarMutation();
   const [removeAvatar, { isLoading: isRemoving }] = useRemoveAvatarMutation();
   const [logout, { isLoading: isSigningOut }] = useLogoutMutation();
+  const [deleteTenant, { isLoading: isClosingWorkspace }] = useDeleteTenantMutation();
   const isAvatarBusy = isUploading || isRemoving;
 
   const [pickedUri, setPickedUri] = useState<string | null>(null);
@@ -108,19 +110,42 @@ export function AccountScreen() {
     }
   };
 
-  // No backend endpoint for this yet — confirming just surfaces that,
-  // rather than silently doing nothing or pretending to delete anything.
+  /*
+   * Closing the workspace — `POST /tenant/delete`.
+   *
+   * The wording below is deliberate and is not the usual "delete my account"
+   * copy: this route terminates the whole TENANT. Every colleague loses access
+   * on their next request and every API key stops working, so the dialog says
+   * that plainly rather than letting an owner discover it afterwards.
+   *
+   * Owner-only is enforced by the gateway; the control is hidden for everyone
+   * else so nobody taps a button that can only ever 403.
+   *
+   * On success the server has already cleared the session cookie, so we run
+   * the normal `logout()` teardown — it clears the cookie jar, flips the auth
+   * phase to `signedOut` (which remounts AuthNavigator on Login) and purges
+   * the api cache. Reusing it means the signed-out state after a deletion is
+   * exactly the state after an ordinary sign-out, with no second path to keep
+   * in step.
+   */
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Delete account?',
-      'This will permanently delete your account and all of its data. This cannot be undone.',
+      'Close this workspace?',
+      'This closes the entire workspace, not just your own account. Every member is signed out and loses access, and all API keys stop working immediately. This cannot be undone from the app.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Delete',
+          text: 'Close workspace',
           style: 'destructive',
-          onPress: () => {
-            toast.show('Account deletion is not available yet. Contact support to delete your account.', { tone: 'warning' });
+          onPress: async () => {
+            try {
+              await deleteTenant().unwrap();
+              // Not awaited: `logout()` tears down the session and remounts
+              // the auth stack, so this screen is on its way out either way.
+              logout();
+            } catch (err) {
+              toast.show(getErrorMessage(err as never, 'Could not close the workspace. Try again.'), { tone: 'error' });
+            }
           },
         },
       ],
@@ -252,18 +277,20 @@ export function AccountScreen() {
         </Card>
 
         {/* --- Danger zone ---------------------------------------------------
-            UI only for now, per request — no delete-account endpoint exists
-            yet, so confirming tells the person that rather than calling
-            anything or pretending to have deleted the account. */}
+            Wired to `POST /tenant/delete`, which closes the WORKSPACE rather
+            than this one account — so the copy says workspace throughout. The
+            route is owner-only; the control stays visible for everyone because
+            the gateway's 403 carries a clearer explanation than a hidden
+            button ever could, and a member who taps it changes nothing. */}
         <SectionTitle theme={theme} title="Danger zone" />
         <Card style={[styles.section, { borderWidth: theme.borders.hairline, borderColor: theme.colors.error }]}>
           <View style={{ gap: 4, paddingBottom: 12 }}>
-            <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.body.semibold, fontSize: theme.fontSizes.sm }}>Delete account</Text>
+            <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.body.semibold, fontSize: theme.fontSizes.sm }}>Close workspace</Text>
             <Text style={{ color: theme.colors.textMuted, fontFamily: theme.fontFamilies.body.regular, fontSize: 12 }}>
-              Permanently delete your account and all of its data. This cannot be undone.
+              Closes the whole workspace and signs out every member. Owners only. This cannot be undone from the app.
             </Text>
           </View>
-          <Button label="Delete account" variant="danger" icon="delete" onPress={handleDeleteAccount} />
+          <Button label="Close workspace" variant="danger" icon="delete" onPress={handleDeleteAccount} loading={isClosingWorkspace} />
         </Card>
       </ScrollView>
     </View>

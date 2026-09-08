@@ -33,14 +33,21 @@ interface LegalRow {
   key: string;
   label: string;
   icon: IconName;
-  /** Left blank until the real links are supplied — a tap shows a toast
-   * instead of opening anything until these are filled in. */
+  /** The published document on the B2B portal. A row with no URL falls back
+   * to a toast rather than opening nothing (see `handleLegalRowPress`). */
   url: string;
 }
 
+/**
+ * Both stores require these to resolve: Apple treats a dead legal link as a
+ * broken feature under Guideline 2.1, and Play requires a reachable privacy
+ * policy on the listing. They open in the system browser rather than an
+ * in-app webview so the address bar shows the person which site they are
+ * reading — worth more on a legal document than a seamless transition.
+ */
 const LEGAL_ROWS: LegalRow[] = [
-  { key: 'terms', label: 'Terms and Conditions', icon: 'gavel', url: '' },
-  { key: 'privacy', label: 'Privacy Policy', icon: 'privacy-tip', url: '' },
+  { key: 'terms', label: 'Terms and Conditions', icon: 'gavel', url: 'https://b2b-fe.aidraftsman.ai/terms-and-conditions' },
+  { key: 'privacy', label: 'Privacy Policy', icon: 'privacy-tip', url: 'https://b2b-fe.aidraftsman.ai/privacy-policy' },
 ];
 
 export function SettingsScreen() {
@@ -64,7 +71,6 @@ export function SettingsScreen() {
         title="Settings"
         mode="tab"
         onMenuPress={() => navigation.dispatch(DrawerActions.openDrawer())}
-        onBellPress={() => navigation.getParent()?.getParent()?.navigate('Notifications' as never)}
       />
       <ScrollView contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 24 }]}>
         {session && (

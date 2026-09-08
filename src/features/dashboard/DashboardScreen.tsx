@@ -96,7 +96,6 @@ export function DashboardScreen() {
         mode="tab"
         onMenuPress={() => navigation.dispatch(DrawerActions.openDrawer())}
         onAvatarPress={() => goToTab(navigation, 'SettingsTab')}
-        onBellPress={() => goToDrawer(navigation, 'Notifications')}
       />
 
       {isFirstLoad ? (

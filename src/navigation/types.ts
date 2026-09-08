@@ -232,7 +232,12 @@ export type AppDrawerParamList = {
   LeadCriteria: NavigatorScreenParams<LeadCriteriaStackParamList> | undefined;
   Reports: NavigatorScreenParams<ReportsStackParamList> | undefined;
   UsageSpend: undefined;
-  Notifications: undefined;
+  /**
+   * `from` is the drawer route that opened the bell, so Back returns to that
+   * screen rather than wherever the drawer's own history happens to point.
+   * Optional: a deep link or a call that omits it falls back to `goBack()`.
+   */
+  Notifications: { from?: string } | undefined;
   ApiKeys: NavigatorScreenParams<ApiKeysStackParamList> | undefined;
   Team: NavigatorScreenParams<TeamStackParamList> | undefined;
   RolesPermissions: NavigatorScreenParams<RolesPermissionsStackParamList> | undefined;

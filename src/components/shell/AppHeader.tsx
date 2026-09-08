@@ -1,5 +1,6 @@
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StyleSheet, Text, TouchableOpacity, View, type ViewStyle } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
 import { Icon } from '@/components/ui';
 import { useGetUnreadNotificationCountQuery } from '@/features/notifications/notificationsApi';
@@ -16,6 +17,20 @@ interface AppHeaderProps {
   mode?: 'tab' | 'stack';
   onBack?: () => void;
   onMenuPress?: () => void;
+  /**
+   * Optional override for the bell. Leave it unset: the header walks to the
+   * root drawer itself and opens Notifications, which is what every tab wants.
+   *
+   * ── WHY THE HEADER OWNS THIS ────────────────────────────────────────────
+   * Each tab root used to pass `getParent()?.getParent()?.navigate(...)`, a
+   * two-hop climb that is only correct when the screen sits exactly two
+   * navigators below the drawer. Dashboard happened to; a screen reached one
+   * level deeper resolved the second `getParent()` to the drawer and then
+   * navigated on ITS parent — undefined — so the tap did nothing at all, with
+   * no error to notice. `getParent('RootDrawer')` asks for the drawer BY ID
+   * (see `AppDrawer`, which sets that id for exactly this) and finds it from
+   * any depth, so the bell cannot silently stop working when a screen moves.
+   */
   onBellPress?: () => void;
   onAvatarPress?: () => void;
   style?: ViewStyle;
@@ -77,6 +92,40 @@ function ProfileAvatar({ onPress }: { onPress?: () => void }) {
 export function AppHeader({ title, mode = 'tab', onBack, onMenuPress, onBellPress, onAvatarPress, style }: AppHeaderProps) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
+
+  /*
+   * Opening the tray, and recording where from.
+   *
+   * `Notifications` is a drawer route, so Back from it is the DRAWER's back —
+   * which returns to whatever that navigator's history points at, not
+   * necessarily the screen the bell was tapped on. Passing the current drawer
+   * route as `from` makes the return trip explicit instead of inferred, so the
+   * bell behaves the same whether it was tapped on a tab root or on a
+   * drawer-level screen like Customers or Reports.
+   *
+   * Reading the route off the drawer's own state rather than this screen's is
+   * deliberate: `MainTabs` is one drawer route covering five tabs, and
+   * navigating back to it restores the tab the person was on, because the tab
+   * navigator keeps its own state.
+   */
+  const openNotifications =
+    onBellPress ??
+    (() => {
+      /* `getParent` is untyped across navigator boundaries, so the shape this
+         call needs — read the focused route, navigate with a param — is named
+         here rather than cast away with `as never` at each use. */
+      const drawer = navigation.getParent('RootDrawer' as never) as unknown as
+        | {
+            getState?: () => { index: number; routes: { name: string }[] };
+            navigate: (screen: 'Notifications', params?: { from?: string }) => void;
+          }
+        | undefined;
+      if (!drawer) return;
+      const state = drawer.getState?.();
+      const from = state ? state.routes[state.index]?.name : undefined;
+      drawer.navigate('Notifications', { from });
+    });
 
   return (
     <View
@@ -128,7 +177,7 @@ export function AppHeader({ title, mode = 'tab', onBack, onMenuPress, onBellPres
 
         {mode === 'tab' && (
           <View style={styles.right}>
-            <NotificationBell onPress={onBellPress} />
+            <NotificationBell onPress={openNotifications} />
             <View style={{ marginLeft: 8 }}>
               <ProfileAvatar onPress={onAvatarPress} />
             </View>

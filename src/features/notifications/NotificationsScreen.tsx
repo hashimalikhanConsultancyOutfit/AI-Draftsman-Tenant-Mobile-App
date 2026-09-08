@@ -1,7 +1,8 @@
 /**
  * Notifications — the bell's tray, reached by tapping the bell in
- * `AppHeader` from any tab (see `goToDrawer`-style navigation in each tab
- * root's `onBellPress`). Ported from web's `NotificationBell.tsx` popover
+ * `AppHeader` from any tab. `AppHeader` navigates here itself via
+ * `getParent('RootDrawer')`, so no screen wires the bell up. Ported from
+ * web's `NotificationBell.tsx` popover
  * (read in full, confirmed against that source 2026-09-04): same three
  * states (loading / empty / list), same category-dot colour coding, same
  * "just now" / "N min ago" time formatting, same "Mark all as read".
@@ -23,13 +24,15 @@
  * the card (marks it read) — it does not attempt to navigate anywhere.
  */
 import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/shell/AppHeader';
 import { Button, EmptyState, ErrorState, Loader, useToast } from '@/components/ui';
 import { getErrorMessage } from '@/services/apiErrorMessage';
 import { useAppTheme, type AppTheme } from '@/theme/ThemeContext';
+
+import type { AppDrawerParamList } from '@/navigation/types';
 
 import {
   useGetNotificationFeedQuery,
@@ -45,7 +48,29 @@ export function NotificationsScreen() {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const route = useRoute<RouteProp<AppDrawerParamList, 'Notifications'>>();
   const toast = useToast();
+
+  /*
+   * Back goes to the screen the bell was tapped on, which `AppHeader` passes
+   * as `from`. Without it we would be at the mercy of the drawer's history,
+   * which is why leaving this screen used to land somewhere the person had
+   * not come from. `goBack()` stays as the fallback for a call that omits the
+   * param, and `MainTabs` catches the case where there is nothing to go back
+   * to at all (a cold start straight onto this route).
+   */
+  const handleBack = () => {
+    const from = route.params?.from;
+    if (from && from !== 'Notifications') {
+      navigation.navigate(from as never);
+      return;
+    }
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate('MainTabs' as never);
+  };
 
   const { data, isLoading, isFetching, isError, error, refetch } = useGetNotificationFeedQuery({ limit: FEED_LIMIT });
   const [markRead] = useMarkNotificationReadMutation();
@@ -68,7 +93,7 @@ export function NotificationsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
-      <AppHeader title="Notifications" mode="stack" onBack={() => navigation.goBack()} />
+      <AppHeader title="Notifications" mode="stack" onBack={handleBack} />
 
       {isLoading ? (
         <Loader fullScreen label="Loading your notifications…" />
