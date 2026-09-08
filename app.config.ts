@@ -83,7 +83,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     /* Play reads the manifest, not our intentions: an explicit versionCode here
        (appVersionSource is "local") means a bump is a reviewed source change
        rather than something EAS infers. */
-    versionCode: 2,
+    versionCode: 3,
     permissions: ['USE_BIOMETRIC', 'USE_FINGERPRINT'],
     /*
      * Permissions expo-image-picker's plugin adds by default for capabilities we
