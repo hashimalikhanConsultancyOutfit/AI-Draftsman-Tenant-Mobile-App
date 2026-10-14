@@ -1,6 +1,7 @@
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 
-import { Icon } from '@/components/ui';
+import { Button, Card, Icon } from '@/components/ui';
+import { isOwnerRole, toRoleLabel } from '@/features/team/teamRules';
 import { getErrorMessage } from '@/services/apiErrorMessage';
 import { clearAllCookies } from '@/services/cookieAuth';
 import { useSelectWorkspaceMutation } from '@/store/authApi';
@@ -10,7 +11,13 @@ import { useAppTheme } from '@/theme/ThemeContext';
 
 import { AuthScreenLayout } from '../components/AuthScreenLayout';
 
-const capitalise = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+const initialsOf = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('') || '?';
 
 /** Shown after OTP for accounts that belong to more than one workspace —
  * the session cookie is only issued once one is chosen, after which the
@@ -29,74 +36,74 @@ export function WorkspaceSelectScreen() {
   };
 
   return (
-    <AuthScreenLayout title="Choose a workspace" subtitle="Where would you like to go?">
-      <View style={{ alignItems: 'center', gap: theme.space('md') }}>
-        <View
-          style={{
-            width: 72,
-            height: 72,
-            borderRadius: theme.radii.full,
-            backgroundColor: theme.colors.statusNeutralBg,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Icon name="domain" size={32} color={theme.colors.statusNeutralFg} />
-        </View>
-        <Text
-          style={{
-            color: theme.colors.textMuted,
-            fontFamily: theme.fontFamilies.body.regular,
-            fontSize: theme.fontSizes.sm,
-            textAlign: 'center',
-          }}
-        >
-          Your account is a member of more than one workspace. Open the one you want — you can move between them afterwards without signing in again.
-        </Text>
-        <Text
-          style={{ color: theme.colors.textMuted, fontFamily: theme.fontFamilies.body.regular, fontSize: theme.fontSizes.xs, textAlign: 'center' }}
-        >
-          Signed in as {pending.email}
-        </Text>
-      </View>
-
-      <View style={{ gap: theme.space('sm'), marginTop: theme.space('md') }}>
+    <AuthScreenLayout
+      eyebrow="Choose workspace"
+      title="Where to?"
+      subtitle={`${pending.email} is a member of ${pending.workspaces.length} workspaces. You can switch between them later without signing in again.`}
+    >
+      <View style={{ gap: theme.space('md') }}>
         {pending.workspaces.map((workspace) => {
+          const owner = isOwnerRole(workspace.role);
           const isThisLoading = isLoading && originalArgs?.handle === workspace.handle;
           return (
             <TouchableOpacity
               key={workspace.handle}
               accessibilityRole="button"
-              accessibilityLabel={`Open ${workspace.name}, ${workspace.role}`}
+              accessibilityLabel={`Open ${workspace.name}, ${toRoleLabel(workspace.role)}`}
               disabled={isLoading}
               onPress={() => selectWorkspace({ handle: workspace.handle })}
               activeOpacity={0.7}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingVertical: theme.space('md'),
-                paddingHorizontal: theme.space('lg'),
-                borderRadius: theme.radii.lg,
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                backgroundColor: theme.colors.surface,
-                opacity: isLoading && !isThisLoading ? 0.5 : 1,
-              }}
+              style={{ opacity: isLoading && !isThisLoading ? 0.5 : 1 }}
             >
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.body.semibold, fontSize: theme.fontSizes.md }}>
-                  {workspace.name}
-                </Text>
-                <Text style={{ color: theme.colors.textMuted, fontFamily: theme.fontFamilies.body.regular, fontSize: theme.fontSizes.xs }}>
-                  {capitalise(workspace.role)}
-                </Text>
-              </View>
-              {isThisLoading ? (
-                <ActivityIndicator color={theme.colors.text} />
-              ) : (
-                <Icon name="arrow-forward" size={20} color={theme.colors.text} />
-              )}
+              <Card style={{ flexDirection: 'row', alignItems: 'center', gap: theme.space('md') }}>
+                <View
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: theme.radii.full,
+                    backgroundColor: theme.colors.accent,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ color: '#fff', fontFamily: theme.fontFamilies.body.semibold, fontSize: theme.fontSizes.md }}>
+                    {initialsOf(workspace.name)}
+                  </Text>
+                </View>
+
+                <View style={{ flex: 1, gap: 6, alignItems: 'flex-start' }}>
+                  <Text
+                    numberOfLines={1}
+                    style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.body.semibold, fontSize: theme.fontSizes.md }}
+                  >
+                    {workspace.name}
+                  </Text>
+                  <View
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 3,
+                      borderRadius: theme.radii.full,
+                      backgroundColor: owner ? theme.colors.statusInfoBg : theme.colors.statusNeutralBg,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: owner ? theme.colors.statusInfoFg : theme.colors.statusNeutralFg,
+                        fontFamily: theme.fontFamilies.body.semibold,
+                        fontSize: 11,
+                      }}
+                    >
+                      {toRoleLabel(workspace.role)}
+                    </Text>
+                  </View>
+                </View>
+
+                {isThisLoading ? (
+                  <ActivityIndicator color={theme.colors.accent} />
+                ) : (
+                  <Icon name="chevron-right" size={24} color={theme.colors.textMuted} />
+                )}
+              </Card>
             </TouchableOpacity>
           );
         })}
@@ -115,11 +122,7 @@ export function WorkspaceSelectScreen() {
         </Text>
       )}
 
-      <TouchableOpacity onPress={handleBack} style={{ alignSelf: 'center', marginTop: theme.space('md') }}>
-        <Text style={{ color: theme.colors.textMuted, fontFamily: theme.fontFamilies.body.semibold, fontSize: theme.fontSizes.sm }}>
-          Back to sign in
-        </Text>
-      </TouchableOpacity>
+      <Button label="Back to sign in" onPress={handleBack} variant="outline" disabled={isLoading} fullWidth />
     </AuthScreenLayout>
   );
 }
