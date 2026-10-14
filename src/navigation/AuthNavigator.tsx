@@ -7,6 +7,7 @@ import { OnboardingIncompleteScreen } from '@/features/auth/screens/OnboardingIn
 import { OtpVerifyScreen } from '@/features/auth/screens/OtpVerifyScreen';
 import { RecoveryCodesScreen } from '@/features/auth/screens/RecoveryCodesScreen';
 import { ResetPasswordScreen } from '@/features/auth/screens/ResetPasswordScreen';
+import { WorkspaceSelectScreen } from '@/features/auth/screens/WorkspaceSelectScreen';
 import { TotpEnrolmentScreen } from '@/features/auth/screens/TotpEnrolmentScreen';
 import { selectAuthPhase } from '@/store/authSlice';
 import { useAppSelector } from '@/store/hooks';
@@ -43,6 +44,8 @@ export function AuthNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {phase === 'awaitingOtp' ? (
         <Stack.Screen name="OtpVerify" component={OtpVerifyScreen} />
+      ) : phase === 'awaitingWorkspace' ? (
+        <Stack.Screen name="WorkspaceSelect" component={WorkspaceSelectScreen} />
       ) : phase === 'awaitingTotpEnrolment' ? (
         hasFreshRecoveryCodes ? (
           <Stack.Screen name="RecoveryCodes" component={RecoveryCodesScreen} />

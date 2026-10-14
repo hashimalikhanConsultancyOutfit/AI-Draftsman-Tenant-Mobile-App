@@ -1,6 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-import type { SessionUser } from '@/types/auth';
+import type { SessionUser, WorkspaceOption } from '@/types/auth';
 
 /**
  * The auth state machine. Every phase maps to exactly one place in the
@@ -44,6 +44,7 @@ export type AuthPhase =
   | 'bootstrapping'
   | 'signedOut'
   | 'awaitingOtp'
+  | 'awaitingWorkspace'
   | 'awaitingTotpEnrolment'
   | 'accountDisabled'
   | 'noWorkspaceAccess'
@@ -71,6 +72,8 @@ export interface AuthState {
   /** Second factor cleared. Only ever true while `isLoggedIn` is true. */
   isOtpVerified: boolean;
   pendingOtp: PendingOtp | null;
+  /** Workspaces to pick from after OTP, for multi-workspace accounts. */
+  pendingWorkspaces: { email: string; workspaces: WorkspaceOption[] } | null;
   pendingEnrolment: PendingTotpEnrolment | null;
   /** Shown once, right after confirm-totp — never persisted or refetchable. */
   freshRecoveryCodes: string[] | null;
@@ -84,6 +87,7 @@ const initialState: AuthState = {
   isLoggedIn: false,
   isOtpVerified: false,
   pendingOtp: null,
+  pendingWorkspaces: null,
   pendingEnrolment: null,
   freshRecoveryCodes: null,
   session: null,
@@ -99,7 +103,7 @@ const initialState: AuthState = {
  * issued. Letting it through is what used to bounce a second sign-in
  * straight back to a blank Login screen instead of opening the OTP screen.
  */
-const IN_FLIGHT_SIGN_IN_PHASES: readonly AuthPhase[] = ['awaitingOtp', 'awaitingTotpEnrolment'];
+const IN_FLIGHT_SIGN_IN_PHASES: readonly AuthPhase[] = ['awaitingOtp', 'awaitingWorkspace', 'awaitingTotpEnrolment'];
 
 /** Wipes every trace of a sign-in. The single place sign-out, an expired
  * session and "start again from the sign-in screen" all funnel through, so
@@ -111,6 +115,7 @@ function resetToSignedOut(state: AuthState) {
   state.isOtpVerified = false;
   state.session = null;
   state.pendingOtp = null;
+  state.pendingWorkspaces = null;
   state.pendingEnrolment = null;
   state.freshRecoveryCodes = null;
   state.refusalMessage = null;
@@ -199,10 +204,22 @@ const authSlice = createSlice({
       state.freshRecoveryCodes = null;
     },
 
-    /** POST /auth/verify-otp succeeded. */
+    /** POST /auth/verify-otp succeeded but the account must pick a workspace
+     * before a session cookie is issued. */
+    workspaceChoiceRequired(state, action: PayloadAction<{ email: string; workspaces: WorkspaceOption[] }>) {
+      state.pendingOtp = null;
+      state.pendingWorkspaces = action.payload;
+      state.isLoggedIn = true;
+      state.isOtpVerified = false;
+      state.phase = 'awaitingWorkspace';
+      state.refusalMessage = null;
+    },
+
+    /** POST /auth/verify-otp (or select-workspace) succeeded. */
     otpVerified(state, action: PayloadAction<SessionUser>) {
       state.session = action.payload;
       state.pendingOtp = null;
+      state.pendingWorkspaces = null;
       state.isLoggedIn = true;
       state.isOtpVerified = true;
       state.phase = action.payload.onboardingStep === 'COMPLETE' ? 'authenticated' : 'onboardingIncomplete';
@@ -253,6 +270,7 @@ export const {
   totpEnrolmentStarted,
   totpConfirmed,
   recoveryCodesAcknowledged,
+  workspaceChoiceRequired,
   otpVerified,
   accountRefused,
   workspaceAccessRevoked,

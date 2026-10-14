@@ -48,13 +48,32 @@ export interface SubmitCredentialsResponse {
 
 /** POST /auth/verify-otp response. `status` is included defensively — the
  * live capture had it, the controller's documented shape didn't list it. */
-export interface VerifyOtpResponse {
+export type VerifyOtpResponse = SessionVerifyResponse | WorkspaceChoiceResponse;
+
+export interface SessionVerifyResponse {
   email: string;
   name: string;
   status?: UserStatus;
   onboardingStep: OnboardingStep;
   role: SessionRole | null;
   rolePermissions: string[];
+}
+
+/** POST /auth/verify-otp for an account in more than one workspace: no
+ * session yet, just the list to choose from (a `b2b_choice` cookie carries
+ * the ticket). Finished by POST /auth/select-workspace. */
+export interface WorkspaceChoiceResponse {
+  workspaceChoiceRequired: true;
+  email: string;
+  workspaces: WorkspaceOption[];
+  invites: unknown[];
+}
+
+export interface WorkspaceOption {
+  /** Opaque handle to pass back to select-workspace. */
+  handle: string;
+  name: string;
+  role: string;
 }
 
 /** GET /auth/session — always 200. `authenticated:false` means every other

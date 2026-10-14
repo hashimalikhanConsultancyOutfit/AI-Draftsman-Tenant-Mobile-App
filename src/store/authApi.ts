@@ -5,6 +5,7 @@ import type {
   EnrolTotpResponse,
   GetSessionResponse,
   SessionUser,
+  SessionVerifyResponse,
   SubmitCredentialsResponse,
   VerifyOtpResponse,
 } from '@/types/auth';
@@ -24,13 +25,14 @@ import {
   totpConfirmed,
   totpEnrolmentStarted,
   workspaceAccessRevoked,
+  workspaceChoiceRequired,
 } from './authSlice';
 
 const REFUSED_MESSAGE = 'This account is not active. Ask an owner in your workspace to re-enable it.';
 const NO_ACCESS_MESSAGE = 'You no longer have access to this workspace.';
 
 function toSessionUser(
-  data: VerifyOtpResponse | GetSessionResponse,
+  data: SessionVerifyResponse | GetSessionResponse,
 ): SessionUser {
   return {
     email: data.email,
@@ -91,7 +93,11 @@ export const authApi = createApi({
         try {
           const { data } = await queryFulfilled;
           if (!data) return;
-          dispatch(otpVerified(toSessionUser(data)));
+          if ('workspaceChoiceRequired' in data) {
+            dispatch(workspaceChoiceRequired({ email: data.email, workspaces: data.workspaces }));
+          } else {
+            dispatch(otpVerified(toSessionUser(data)));
+          }
         } catch (err) {
           const error = (err as { error?: ApiQueryError }).error;
           if (error?.status === 403) {
@@ -99,6 +105,23 @@ export const authApi = createApi({
           }
           // 400/401/429 (bad code, expired ticket, throttled) are left for
           // the OTP screen itself to show inline — they don't change phase.
+        }
+      },
+    }),
+
+    selectWorkspace: builder.mutation<SessionVerifyResponse, { handle: string }>({
+      query: (body) => ({ url: '/auth/select-workspace', method: 'POST', body }),
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (!data) return;
+          dispatch(otpVerified(toSessionUser(data)));
+        } catch (err) {
+          const error = (err as { error?: ApiQueryError }).error;
+          if (error?.status === 403) {
+            dispatch(workspaceAccessRevoked({ message: error.messages[0] ?? NO_ACCESS_MESSAGE }));
+          }
+          // Expired choice ticket / other errors are shown inline by the screen.
         }
       },
     }),
@@ -207,6 +230,7 @@ export const authApi = createApi({
 export const {
   useSubmitCredentialsMutation,
   useVerifyOtpMutation,
+  useSelectWorkspaceMutation,
   useEnrolTotpMutation,
   useConfirmTotpMutation,
   useForgotPasswordMutation,
