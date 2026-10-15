@@ -27,6 +27,27 @@ export const PLAYGROUND_PERMISSIONS = {
   RUN: 'playground.run',
 } as const;
 
+/** Mirrors web's `AGENT_TEAM_PERMISSIONS` (store/api/permissionCatalogue.ts),
+ * itself the backend's. `run`, `approve`, `cancel` and `trace` belong to a
+ * team RUN, which is driven from inside a chat thread. */
+/** Mirrors web's `SURVEY_PERMISSIONS`: MANAGE gates the manager's Surveys
+ * module; RESPOND (seeded to every tenant user) gates My Surveys. */
+export const SURVEY_PERMISSIONS = {
+  MANAGE: 'survey.manage',
+  RESPOND: 'survey.respond',
+} as const;
+
+export const AGENT_TEAM_PERMISSIONS = {
+  VIEW: 'agent_team.view',
+  BUILD: 'agent_team.build',
+  RUN: 'agent_team.run',
+  APPROVE: 'agent_team.approve',
+  CANCEL: 'agent_team.cancel',
+  SCHEDULE: 'agent_team.schedule',
+  DELETE: 'agent_team.delete',
+  TRACE: 'agent_team.trace',
+} as const;
+
 export const AGENT_PERMISSIONS = {
   VIEW: 'agent.view',
   BUILD: 'agent.build',

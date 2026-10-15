@@ -1,67 +1,109 @@
-import { useState } from 'react';
-import { ActivityIndicator, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Button, Icon, useToast } from '@/components/ui';
+import { Button, Icon, PickerField, TextField, useToast } from '@/components/ui';
 import { useAppTheme } from '@/theme/ThemeContext';
+import { getErrorMessage } from '@/services/apiErrorMessage';
+import { useCreateTeamThreadMutation } from '@/features/agent-teams/agentTeamsApi';
+import { AgentChecklistField } from '@/features/agent-teams/components/AgentChecklistField';
 import { useGetAllKnowledgeBasesQuery } from '@/features/knowledge-bases/knowledgeBasesApi';
 
 import { MAX_THREAD_TITLE_LENGTH, NO_PERMISSION_MESSAGE, THREAD_ACTION_COPY, threadDisplayName } from '../chatRules';
 import { useCreateChatThreadMutation, useGetAvailableAgentsForChatQuery } from '../chatApi';
-import type { AvailableAgent } from '../chat.types';
+import { ANSWERED_BY_OPTIONS, MAX_THREAD_AGENTS, NEW_THREAD_TEAM_COPY as COPY, agentBlockedNote, knowledgeBaseHint, validateTeamAgents, type ThreadKind } from '../teamChatRules';
 
 interface NewThreadSheetProps {
   visible: boolean;
   canManage: boolean;
   onClose: () => void;
   onCreated: (conversationId: string) => void;
-}
-
-/** Per-status usability, mirroring the web's disabled options with their
- * own reasons — a agent missing from the list entirely would read as a
- * loading fault, so every agent shows, some just cannot be picked. */
-function agentHint(status: AvailableAgent['status']): string | null {
-  switch (status) {
-    case 'DRAFT':
-      return 'not evaluated';
-    case 'ARCHIVED':
-      return 'archived';
-    case 'EVALUATED':
-      return 'not deployed';
-    case 'DEPLOYED':
-      return null;
-    default:
-      return 'not deployed';
-  }
+  /** Which kind the sheet opens on — the list's current tab, as web's
+   * dialog defaults "Answered by" to the tab it was opened from. */
+  initialAnsweredBy?: ThreadKind;
+  /** Pre-ticked team agents (a builder team's "Chat"). Only agents the
+   * picker can actually offer are kept — an unpickable one would sit in the
+   * value with no row to untick it from, exactly web's rule. */
+  initialAgentIds?: string[];
 }
 
 /**
- * New-thread form: name (optional), agent (required), knowledge base
- * (optional). Reached from four places on web — here, one sheet serves the
- * ThreadList header `+`, the empty-state CTA, and the landing-panel CTA
- * alike, all pushing the same component.
+ * New thread — web's dialog (`NEW_THREAD_FIELDS`), field for field:
+ *  - Thread name (optional; blank → the first message names it),
+ *  - Answered by * (One agent / A team of agents),
+ *  - Agent * — a searchable select, preselected to the first usable agent —
+ *    or Agents * — a searchable checklist, at most 8, "n of 8 selected",
+ *  - Knowledge base (optional, "No knowledge base" first).
+ * Agents that are not deployed are listed but cannot be picked, with the
+ * reason ("not evaluated" / "archived" / "not deployed"), in both pickers.
  */
-export function NewThreadSheet({ visible, canManage, onClose, onCreated }: NewThreadSheetProps) {
+export function NewThreadSheet({ visible, canManage, onClose, onCreated, initialAnsweredBy = 'agent', initialAgentIds }: NewThreadSheetProps) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const toast = useToast();
 
   const [title, setTitle] = useState('');
-  const [agentId, setAgentId] = useState<string | null>(null);
-  const [knowledgeBaseId, setKnowledgeBaseId] = useState<string | null>(null);
+  const [answeredBy, setAnsweredBy] = useState<ThreadKind>(initialAnsweredBy);
+  const [agentId, setAgentId] = useState('');
+  const [teamAgentIds, setTeamAgentIds] = useState<string[]>([]);
+  const [teamError, setTeamError] = useState<string | null>(null);
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [knowledgeBaseId, setKnowledgeBaseId] = useState('');
+  const isTeam = answeredBy === 'team';
 
   const agentsQuery = useGetAvailableAgentsForChatQuery(undefined, { skip: !visible });
   const kbQuery = useGetAllKnowledgeBasesQuery(undefined, { skip: !visible });
   const [createThread, { isLoading: isCreating }] = useCreateChatThreadMutation();
+  const [createTeamThread, { isLoading: isCreatingTeam }] = useCreateTeamThreadMutation();
+  const submitting = isCreating || isCreatingTeam;
 
-  const usableAgents = agentsQuery.data ?? [];
-  const selectableAgentId = agentId ?? usableAgents.find((a) => a.status === 'DEPLOYED')?.id ?? null;
+  /* ONE option list for both pickers, under one rule — web's `agentOptions`. */
+  const agentOptions = useMemo(
+    () =>
+      (agentsQuery.data ?? []).map((agent) => {
+        const blocked = agentBlockedNote(agent.status);
+        return { value: agent.id, label: agent.name, disabled: Boolean(blocked), description: blocked ?? undefined, hint: blocked };
+      }),
+    [agentsQuery.data],
+  );
+  const firstUsable = agentOptions.find((o) => !o.disabled)?.value ?? '';
 
-  const handleClose = () => {
+  const kbOptions = useMemo(
+    () => [{ value: '', label: COPY.noKb }, ...(kbQuery.data ?? []).map((kb) => ({ value: kb.id, label: kb.name }))],
+    [kbQuery.data],
+  );
+  const kbSettledAndEmpty = !kbQuery.isFetching && (kbQuery.data ?? []).length === 0;
+
+  /* Every open starts clean, on the tab's kind, with the first usable agent
+     picked — exactly what web's dialog seeds. */
+  useEffect(() => {
+    if (!visible) return;
     setTitle('');
-    setAgentId(null);
-    setKnowledgeBaseId(null);
+    setAnsweredBy(initialAnsweredBy);
+    setTeamAgentIds([]);
+    setTeamError(null);
+    setAgentError(null);
+    setKnowledgeBaseId('');
+    setAgentId('');
+  }, [visible, initialAnsweredBy]);
+
+  useEffect(() => {
+    if (visible && !agentId && firstUsable) setAgentId(firstUsable);
+  }, [visible, agentId, firstUsable]);
+
+  /* Seeded once the agent list has loaded, so the "offerable" filter has
+     something to check against. */
+  const presetKey = (initialAgentIds ?? []).join(',');
+  useEffect(() => {
+    if (!visible || !presetKey || !agentsQuery.data) return;
+    const offerable = new Set(agentOptions.filter((o) => !o.disabled).map((o) => o.value));
+    setTeamAgentIds(presetKey.split(',').filter((id) => offerable.has(id)).slice(0, MAX_THREAD_AGENTS));
+  }, [visible, presetKey, agentsQuery.data, agentOptions]);
+
+  const done = (id: string, createdTitle: string | null | undefined) => {
+    toast.show(THREAD_ACTION_COPY.create.done(threadDisplayName(createdTitle ?? '')), { tone: 'success' });
     onClose();
+    onCreated(id);
   };
 
   const handleCreate = async () => {
@@ -69,163 +111,140 @@ export function NewThreadSheet({ visible, canManage, onClose, onCreated }: NewTh
       toast.show(NO_PERMISSION_MESSAGE.manage, { tone: 'warning' });
       return;
     }
-    if (!selectableAgentId) return;
+    const trimmed = title.trim();
+    if (isTeam) {
+      const error = validateTeamAgents(teamAgentIds);
+      setTeamError(error);
+      if (error) return;
+      try {
+        const created = await createTeamThread({
+          /* Omitted rather than sent empty — the first message names it. */
+          ...(trimmed ? { title: trimmed } : {}),
+          mode: 'AGENT_TEAM',
+          agentIds: teamAgentIds,
+          ...(knowledgeBaseId ? { knowledgeBaseId } : {}),
+        }).unwrap();
+        done(created.id, created.title);
+      } catch (err) {
+        toast.show(getErrorMessage(err as never, COPY.saveFailed), { tone: 'error' });
+      }
+      return;
+    }
+    if (!agentId) {
+      setAgentError('Agent is required');
+      return;
+    }
     try {
-      const created = await createThread({
-        title,
-        agentId: selectableAgentId,
-        knowledgeBaseId,
-      }).unwrap();
-      toast.show(THREAD_ACTION_COPY.create.done(threadDisplayName(created.title)), { tone: 'success' });
-      handleClose();
-      onCreated(created.id);
-    } catch {
-      toast.show(THREAD_ACTION_COPY.create.failed, { tone: 'error' });
+      const created = await createThread({ title: trimmed, agentId, knowledgeBaseId: knowledgeBaseId || null }).unwrap();
+      done(created.id, created.title);
+    } catch (err) {
+      toast.show(getErrorMessage(err as never, COPY.saveFailed), { tone: 'error' });
     }
   };
 
-  return (
-    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={handleClose}>
-      <View style={styles.scrim}>
-        <View
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: theme.colors.surface,
-              paddingBottom: insets.bottom + 16,
-              borderTopLeftRadius: theme.radii.sheetTop,
-              borderTopRightRadius: theme.radii.sheetTop,
-            },
-          ]}
-        >
-          <View style={[styles.handle, { backgroundColor: theme.colors.border }]} />
-          <View style={styles.header}>
-            <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.display.semibold, fontSize: theme.fontSizes.lg }}>
-              New thread
-            </Text>
-            <TouchableOpacity onPress={handleClose} accessibilityRole="button" accessibilityLabel="Close">
-              <Icon name="close" size={22} color={theme.colors.textMuted} />
-            </TouchableOpacity>
-          </View>
+  const agentHint = agentsQuery.isError ? COPY.agentsUnavailable : agentsQuery.isSuccess && !firstUsable ? COPY.noUsableAgent : undefined;
 
-          <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: theme.colors.text }]}>Name</Text>
-              <TextInput
+  return (
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.scrim}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} accessibilityLabel="Close" />
+          <View
+            style={[
+              styles.sheet,
+              { backgroundColor: theme.colors.surface, paddingBottom: insets.bottom + 16, borderTopLeftRadius: theme.radii.sheetTop, borderTopRightRadius: theme.radii.sheetTop },
+            ]}
+          >
+            <View style={[styles.handle, { backgroundColor: theme.colors.border }]} />
+            <View style={styles.header}>
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.display.semibold, fontSize: theme.fontSizes.lg }}>New thread</Text>
+              <TouchableOpacity onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close">
+                <Icon name="close" size={22} color={theme.colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+              <Text style={{ color: theme.colors.textMuted, fontFamily: theme.fontFamilies.body.regular, fontSize: theme.fontSizes.sm, lineHeight: 20 }}>{COPY.description}</Text>
+
+              <TextField
+                label={COPY.nameLabel}
                 value={title}
                 onChangeText={setTitle}
                 maxLength={MAX_THREAD_TITLE_LENGTH}
-                placeholder="Optional"
-                placeholderTextColor={theme.colors.textMuted}
-                style={[
-                  styles.input,
-                  { color: theme.colors.text, borderColor: theme.colors.border, borderRadius: theme.radii.lg },
-                ]}
+                placeholder={COPY.namePlaceholder}
+                hint={COPY.nameHint}
               />
-              <Text style={[styles.hint, { color: theme.colors.textMuted }]}>
-                Optional — leave it blank and the first message names the thread.
-              </Text>
-            </View>
 
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: theme.colors.text }]}>Agent</Text>
-              {agentsQuery.isLoading ? (
-                <ActivityIndicator color={theme.colors.accent} style={{ alignSelf: 'flex-start' }} />
-              ) : agentsQuery.isError ? (
-                <Text style={{ color: theme.colors.error, fontSize: 12 }}>
-                  Agents could not be loaded — try again in a moment.
-                </Text>
+              <PickerField
+                label={COPY.answeredByLabel}
+                value={answeredBy}
+                options={ANSWERED_BY_OPTIONS}
+                onChange={(v) => {
+                  setAnsweredBy(v as ThreadKind);
+                  setTeamError(null);
+                  setAgentError(null);
+                }}
+              />
+
+              {isTeam ? (
+                <AgentChecklistField
+                  label={COPY.agentsLabel}
+                  values={teamAgentIds}
+                  options={agentOptions}
+                  onChange={(ids) => {
+                    setTeamAgentIds(ids);
+                    if (teamError) setTeamError(validateTeamAgents(ids));
+                  }}
+                  maxItems={MAX_THREAD_AGENTS}
+                  loading={agentsQuery.isLoading}
+                  loadError={agentsQuery.isError ? COPY.agentsUnavailable : null}
+                  hint={COPY.agentsHint}
+                  error={teamError ?? undefined}
+                />
               ) : (
-                <View style={styles.options}>
-                  {usableAgents.map((agent) => {
-                    const hint = agentHint(agent.status);
-                    const disabled = hint !== null;
-                    const selected = selectableAgentId === agent.id;
-                    return (
-                      <TouchableOpacity
-                        key={agent.id}
-                        disabled={disabled}
-                        onPress={() => setAgentId(agent.id)}
-                        style={[
-                          styles.option,
-                          {
-                            borderColor: selected ? theme.colors.accent : theme.colors.border,
-                            backgroundColor: selected ? theme.colors.accent + '10' : 'transparent',
-                            opacity: disabled ? 0.5 : 1,
-                          },
-                        ]}
-                      >
-                        <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.body.medium, fontSize: 14 }}>
-                          {agent.name}
-                        </Text>
-                        {hint && <Text style={{ color: theme.colors.textMuted, fontSize: 11 }}>{hint}</Text>}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                <PickerField
+                  label={COPY.agentLabel}
+                  value={agentId}
+                  options={agentOptions}
+                  onChange={(v) => {
+                    setAgentId(v);
+                    setAgentError(null);
+                  }}
+                  searchable
+                  searchPlaceholder={COPY.searchAgents}
+                  placeholder={agentsQuery.isLoading ? 'Loading agents…' : 'Select…'}
+                  disabled={agentsQuery.isLoading}
+                  hint={agentHint}
+                  error={agentError ?? undefined}
+                />
               )}
-            </View>
 
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: theme.colors.text }]}>Knowledge base</Text>
-              {kbQuery.isLoading ? (
-                <Text style={{ color: theme.colors.textMuted, fontSize: 12 }}>Loading your knowledge bases…</Text>
-              ) : (kbQuery.data ?? []).length === 0 ? (
-                <Text style={{ color: theme.colors.textMuted, fontSize: 12 }}>You have no knowledge bases yet.</Text>
-              ) : (
-                <View style={styles.options}>
-                  <TouchableOpacity
-                    onPress={() => setKnowledgeBaseId(null)}
-                    style={[
-                      styles.option,
-                      { borderColor: knowledgeBaseId === null ? theme.colors.accent : theme.colors.border },
-                    ]}
-                  >
-                    <Text style={{ color: theme.colors.text, fontSize: 14 }}>No knowledge base</Text>
-                  </TouchableOpacity>
-                  {(kbQuery.data ?? []).map((kb) => (
-                    <TouchableOpacity
-                      key={kb.id}
-                      onPress={() => setKnowledgeBaseId(kb.id)}
-                      style={[
-                        styles.option,
-                        { borderColor: knowledgeBaseId === kb.id ? theme.colors.accent : theme.colors.border },
-                      ]}
-                    >
-                      <Text style={{ color: theme.colors.text, fontSize: 14 }}>{kb.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-            </View>
-          </ScrollView>
+              <PickerField
+                label={COPY.kbLabel}
+                value={knowledgeBaseId}
+                options={kbOptions}
+                onChange={setKnowledgeBaseId}
+                searchable={kbOptions.length > 6}
+                hint={kbQuery.isFetching && !kbQuery.data ? 'Loading your knowledge bases…' : knowledgeBaseHint(kbQuery.isError, kbSettledAndEmpty)}
+              />
+            </ScrollView>
 
-          <View style={styles.footer}>
-            <Button
-              label="Create thread"
-              onPress={handleCreate}
-              loading={isCreating}
-              disabled={!selectableAgentId}
-              fullWidth
-            />
+            <View style={[styles.footer, { borderTopColor: theme.colors.border }]}>
+              <Button label="Cancel" variant="outline" onPress={onClose} disabled={submitting} style={{ flex: 1 }} />
+              <Button label="Create thread" onPress={handleCreate} loading={submitting} style={{ flex: 1 }} />
+            </View>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   scrim: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
-  sheet: { maxHeight: '85%', paddingTop: 10 },
+  sheet: { maxHeight: '90%', paddingTop: 10 },
   handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 10 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 8 },
-  body: { paddingHorizontal: 20, gap: 18, paddingBottom: 8 },
-  field: { gap: 8 },
-  label: { fontSize: 13, fontWeight: '600' },
-  input: { borderWidth: 1, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 },
-  hint: { fontSize: 11 },
-  options: { gap: 8 },
-  option: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, gap: 2 },
-  footer: { paddingHorizontal: 20, paddingTop: 10 },
+  body: { paddingHorizontal: 20, gap: 18, paddingBottom: 12 },
+  footer: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth },
 });

@@ -2,6 +2,8 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { Icon } from '@/components/ui';
 import { useAppTheme } from '@/theme/ThemeContext';
+
+import { isTeamThread } from '../teamChatRules';
 import { formatMoneyCents, formatRelativeTime } from '@/utils/format';
 
 import type { ChatThread } from '../chat.types';
@@ -52,8 +54,9 @@ export function ThreadCard({
   // `agentDeleted` is the one condition that makes an otherwise ordinary
   // thread unable to take new messages, and it is worth saying on the row
   // rather than only discovering it at the composer.
+  const isTeam = isTeamThread(thread);
   const meta = [
-    thread.agentId ? agentDisplayName(thread.agentName) : '—',
+    isTeam ? thread.agentTeamName || 'Team' : thread.agentId ? agentDisplayName(thread.agentName) : '—',
     formatRelativeTime(thread.lastActivityAt),
   ].join(' · ');
 
@@ -86,7 +89,7 @@ export function ThreadCard({
         ]}
       >
         <Icon
-          name={selected ? 'check' : thread.agentDeleted ? 'person-off' : 'chat-bubble-outline'}
+          name={selected ? 'check' : isTeam ? 'groups' : thread.agentDeleted ? 'person-off' : 'chat-bubble-outline'}
           size={20}
           color={selected ? theme.colors.textOnAccent : theme.colors.accent}
         />

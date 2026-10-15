@@ -8,6 +8,12 @@ import { Icon } from './Icon';
 export interface PickerOption {
   label: string;
   value: string;
+  /** A second, muted line under the label — in the sheet only, so the
+   * field itself stays a short single line. */
+  description?: string;
+  /** Shown but not pickable — web's disabled option. Put the reason in
+   * `description` so the row says why. */
+  disabled?: boolean;
 }
 
 interface PickerFieldProps {
@@ -21,6 +27,7 @@ interface PickerFieldProps {
   /** Renders a text filter above the option list — worth it past a
    * handful of options (countries, industries). */
   searchable?: boolean;
+  searchPlaceholder?: string;
   disabled?: boolean;
 }
 
@@ -31,7 +38,7 @@ interface PickerFieldProps {
  * and Lead criteria both need several plain single-selects with no
  * dedicated screen worth a whole component per field.
  */
-export function PickerField({ label, hint, error, placeholder = 'Select…', value, options, onChange, searchable = false, disabled = false }: PickerFieldProps) {
+export function PickerField({ label, hint, error, placeholder = 'Select…', value, options, onChange, searchable = false, searchPlaceholder = 'Search…', disabled = false }: PickerFieldProps) {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
@@ -42,14 +49,24 @@ export function PickerField({ label, hint, error, placeholder = 'Select…', val
 
   return (
     <View style={styles.wrapper}>
-      {label && <Text style={[styles.label, { color: theme.colors.text, fontFamily: theme.fontFamilies.body.semibold }]}>{label}</Text>}
+      {/* Same label style as TextField, so mixed forms read as one. */}
+      {label && <Text style={[styles.label, { color: theme.colors.text, fontSize: theme.fontSizes.sm, fontFamily: theme.fontFamilies.body.medium }]}>{label}</Text>}
       <TouchableOpacity
         onPress={() => !disabled && setOpen(true)}
         disabled={disabled}
-        style={[styles.field, { borderColor: error ? theme.colors.error : theme.colors.border, borderRadius: theme.radii.md, backgroundColor: disabled ? theme.colors.statusNeutralBg : theme.colors.surface }]}
+        style={[
+          styles.field,
+          {
+            borderColor: error ? theme.colors.error : theme.colors.border,
+            borderWidth: theme.borders.interactive,
+            borderRadius: theme.radii.lg,
+            minHeight: theme.controlHeights.md,
+            backgroundColor: disabled ? theme.colors.statusNeutralBg : theme.colors.surface,
+          },
+        ]}
         accessibilityRole="button"
       >
-        <Text style={{ color: selected ? theme.colors.text : theme.colors.textMuted, fontFamily: theme.fontFamilies.body.regular, fontSize: theme.fontSizes.sm, flex: 1 }} numberOfLines={1}>
+        <Text style={{ color: selected ? theme.colors.text : theme.colors.textMuted, fontFamily: theme.fontFamilies.body.regular, fontSize: theme.fontSizes.md, flex: 1 }} numberOfLines={1}>
           {selected ? selected.label : placeholder}
         </Text>
         <Icon name="expand-more" size={18} color={theme.colors.textMuted} />
@@ -69,7 +86,7 @@ export function PickerField({ label, hint, error, placeholder = 'Select…', val
                 <TextInput
                   value={filter}
                   onChangeText={setFilter}
-                  placeholder="Search…"
+                  placeholder={searchPlaceholder}
                   placeholderTextColor={theme.colors.textMuted}
                   style={{ borderWidth: StyleSheet.hairlineWidth, borderColor: theme.colors.border, borderRadius: theme.radii.md, paddingHorizontal: 12, paddingVertical: 8, color: theme.colors.text }}
                 />
@@ -79,15 +96,22 @@ export function PickerField({ label, hint, error, placeholder = 'Select…', val
               {visible.map((option) => (
                 <TouchableOpacity
                   key={option.value}
+                  disabled={option.disabled}
+                  accessibilityState={{ disabled: Boolean(option.disabled), selected: value === option.value }}
                   onPress={() => {
                     onChange(option.value);
                     setOpen(false);
                     setFilter('');
                   }}
-                  style={[styles.option, { borderColor: value === option.value ? theme.colors.accent : theme.colors.border }]}
+                  style={[styles.option, { borderColor: value === option.value ? theme.colors.accent : theme.colors.border, backgroundColor: value === option.value ? theme.colors.accent + '0D' : 'transparent', opacity: option.disabled ? 0.5 : 1 }]}
                 >
-                  <Text style={{ color: theme.colors.text, fontSize: 14 }}>{option.label}</Text>
-                  {value === option.value && <Icon name="check" size={16} color={theme.colors.accent} />}
+                  {/* flex: 1 so a long label wraps INSIDE the row and the
+                      check keeps its own slot instead of hitting the border. */}
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.body.medium, fontSize: 14 }}>{option.label}</Text>
+                    {option.description ? <Text style={{ color: theme.colors.textMuted, fontFamily: theme.fontFamilies.body.regular, fontSize: 12, lineHeight: 17 }}>{option.description}</Text> : null}
+                  </View>
+                  {value === option.value && <Icon name="check" size={18} color={theme.colors.accent} />}
                 </TouchableOpacity>
               ))}
               {visible.length === 0 && <Text style={{ color: theme.colors.textMuted, fontSize: 13, paddingVertical: 12 }}>No matches.</Text>}
@@ -102,10 +126,10 @@ export function PickerField({ label, hint, error, placeholder = 'Select…', val
 const styles = StyleSheet.create({
   wrapper: { gap: 6 },
   label: { fontSize: 13 },
-  field: { flexDirection: 'row', alignItems: 'center', borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, paddingVertical: 12, gap: 8 },
-  hint: { fontSize: 11 },
+  field: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  hint: { fontSize: 12, lineHeight: 17 },
   scrim: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
   sheet: { paddingTop: 10, maxHeight: '75%' },
   handle: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 6 },
-  option: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12 },
+  option: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12 },
 });

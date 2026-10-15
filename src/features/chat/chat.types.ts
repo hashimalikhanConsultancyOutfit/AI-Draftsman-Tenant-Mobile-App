@@ -23,7 +23,9 @@
 /* -------------------------------------------------------------------------- */
 
 /** How a turn is produced. `AGENT` always carries an `agentId`. */
-export type ChatMode = 'SOCKET' | 'AGENT';
+/** `AGENT_TEAM` threads are answered by a roster of agents — created from
+ * the Agents Teams module (see `agentTeamsApi.createTeamThread`). */
+export type ChatMode = 'SOCKET' | 'AGENT' | 'AGENT_TEAM';
 
 export type ConversationStatus = 'ACTIVE' | 'ARCHIVED' | 'DELETED';
 
@@ -57,7 +59,9 @@ export type BalanceBlocker = 'TENANT' | 'CUSTOMER' | 'KEY' | 'WALLET';
 /** Stable machine code on the conversation itself. Today the only value is
  * `AGENT_DELETED`; treat an unrecognised one as "blocked, reason unknown"
  * rather than as "not blocked". */
-export type SendBlockedReason = 'AGENT_DELETED';
+/** `TEAM_DELETED` — seen live on 2026-10-15: a team thread whose team was
+ * deleted. */
+export type SendBlockedReason = 'AGENT_DELETED' | 'TEAM_DELETED';
 
 /* -------------------------------------------------------------------------- */
 /* UI types                                                                    */
@@ -87,6 +91,12 @@ export interface ChatThread {
    * conversation say *which* agent went away. */
   agentName: string | null;
   agentDeleted: boolean;
+  /** Set on an `AGENT_TEAM` thread: the roster the server minted for it.
+   * A thread is answered by one agent OR one team, never both. Optional
+   * because an older gateway omits the keys. */
+  agentTeamId?: string | null;
+  agentTeamName?: string | null;
+  agentTeamRevision?: number | null;
   /** Bind the composer's enabled state to THIS FIELD, not to `agentDeleted`.
    * The backend may add reasons; re-deriving would miss them. */
   canSend: boolean;

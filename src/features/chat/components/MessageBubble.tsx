@@ -25,6 +25,9 @@ interface MessageBubbleProps {
   canViewCost: boolean;
   onRetry: () => void;
   onCopy: (text: string) => void;
+  /** On a team thread: which specialist wrote this reply. Shown above the
+   * bubble — on a one-agent thread every reply is the same agent's. */
+  authorName?: string | null;
 }
 
 /**
@@ -48,6 +51,7 @@ export function MessageBubble({
   canViewCost,
   onRetry,
   onCopy,
+  authorName = null,
 }: MessageBubbleProps) {
   const { theme } = useAppTheme();
   const isUser = message.role === 'USER';
@@ -65,6 +69,14 @@ export function MessageBubble({
 
   return (
     <View style={[styles.outer, isUser ? styles.outerUser : styles.outerAi]}>
+      {!isUser && authorName ? (
+        <View style={styles.author}>
+          <View style={[styles.authorDot, { backgroundColor: theme.colors.accent }]} />
+          <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.body.semibold, fontSize: 12 }} numberOfLines={1}>
+            {authorName}
+          </Text>
+        </View>
+      ) : null}
       <View
         style={[
           styles.bubble,
@@ -250,6 +262,8 @@ function CodeBlock({ code, onCopy }: { code: { text: string; language?: string }
 }
 
 const styles = StyleSheet.create({
+  author: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, maxWidth: '85%' },
+  authorDot: { width: 6, height: 6, borderRadius: 3 },
   outer: { gap: 4, marginBottom: 8, maxWidth: '86%' },
   outerUser: { alignSelf: 'flex-end', alignItems: 'flex-end' },
   outerAi: { alignSelf: 'flex-start', alignItems: 'flex-start' },

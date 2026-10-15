@@ -62,6 +62,23 @@ export const api = createApi({
     'Account',
     'UsageCredits',
     'Analytics',
+    'AgentTeam',
+    'AgentTeamSchedule',
+    /* Keyed by run id, `THREAD:<conversationId>`, `EVENTS:<runId>` and
+       `INTERACTIONS:<runId>`. */
+    'AgentTeamRun',
+    /* Keyed by survey id, plus `LIST`. */
+    'Survey',
+    /* Keyed by survey id — schedule, runs, responses, dashboard and
+       audience preview each read under their own prefix. */
+    'SurveySchedule',
+    'SurveyRun',
+    'SurveyResponse',
+    'SurveyDashboard',
+    'SurveyAudience',
+    'WorkspaceMember',
+    /* The respondent's own assignments, keyed by assignment id + `LIST`. */
+    'MySurvey',
   ],
   endpoints: () => ({}),
 });

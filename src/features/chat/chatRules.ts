@@ -149,7 +149,7 @@ export const THREAD_ACTION_COPY = {
     failed: "Could not update that thread's archive state.",
   },
   rename: { done: (n: string) => `Renamed to "${n}"`, failed: 'Could not save that thread.' },
-  create: { done: (n: string) => `Thread "${n}" created.`, failed: 'Could not save that thread.' },
+  create: { done: (n: string) => `Thread “${n}” created.`, failed: 'Could not save that thread.' },
 } as const;
 
 export const DELETE_THREAD_COPY = {
@@ -238,6 +238,8 @@ export const BLOCKED_BY_NOTE: Record<BalanceBlocker, string> = {
 export const BLOCK_NO_BALANCE_FALLBACK = 'This conversation has reached its spend limit.';
 export const BLOCK_AGENT_DELETED =
   'The agent behind this thread has been deleted, so it can no longer answer.';
+export const BLOCK_TEAM_DELETED =
+  'The team behind this thread has been deleted, so it can no longer answer.';
 export const BLOCK_SEND_UNAVAILABLE = 'This thread cannot take new messages.';
 
 const BLOCKER_ACTION: Record<BalanceBlocker, ComposerBlock['action']> = {
@@ -277,7 +279,12 @@ export function resolveComposerBlock(args: {
   // field rather than re-deriving so a new server reason still blocks.
   if (!thread.canSend) {
     return {
-      message: thread.sendBlockedReason === 'AGENT_DELETED' ? BLOCK_AGENT_DELETED : BLOCK_SEND_UNAVAILABLE,
+      message:
+        thread.sendBlockedReason === 'AGENT_DELETED'
+          ? BLOCK_AGENT_DELETED
+          : thread.sendBlockedReason === 'TEAM_DELETED'
+            ? BLOCK_TEAM_DELETED
+            : BLOCK_SEND_UNAVAILABLE,
       isTransient: false,
       action: null,
     };

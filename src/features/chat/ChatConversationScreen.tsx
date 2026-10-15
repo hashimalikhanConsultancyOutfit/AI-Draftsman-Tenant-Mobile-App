@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import { FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
@@ -7,7 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/shell/AppHeader';
 import { EmptyState, ErrorState, Icon, Loader, useToast } from '@/components/ui';
-import { CHAT_PERMISSIONS, USAGE_PERMISSIONS } from '@/permissions/slugs';
+import { useGetAgentTeamQuery } from '@/features/agent-teams/agentTeamsApi';
+import { AGENT_TEAM_PERMISSIONS, CHAT_PERMISSIONS, USAGE_PERMISSIONS } from '@/permissions/slugs';
 import { usePermission } from '@/permissions/usePermission';
 import { getErrorMessage } from '@/services/apiErrorMessage';
 import { useAppTheme } from '@/theme/ThemeContext';
@@ -37,6 +38,14 @@ import { Composer } from './components/Composer';
 import { MessageBubble } from './components/MessageBubble';
 import { SendQueueRail } from './components/SendQueueRail';
 import { TypingDots } from './components/TypingDots';
+import { SpecialistReplies } from './components/SpecialistReplies';
+import { TeamInteractionCard, type InteractionDecision } from './components/TeamInteractionCard';
+import { TeamRunBand } from './components/TeamRunBand';
+import { INTERACTION_COPY, groupTeamTranscript, isTeamThread, type TeamTranscriptItem } from './teamChatRules';
+import { useCancelTeamRunMutation, useResolveTeamInteractionMutation } from './teamRunApi';
+import { useTeamRun } from './useTeamRun';
+
+type TranscriptItem = TeamTranscriptItem<ChatMessage>;
 
 type Nav = NativeStackNavigationProp<ChatConversationStackParamList>;
 type Rt = RouteProp<ChatConversationStackParamList, 'ChatConversation'>;
@@ -63,7 +72,71 @@ export function ChatConversationScreen() {
   const attachments = useComposerAttachments(params.conversationId);
   const [retryMessage] = useRetryChatMessageMutation();
 
-  const listRef = useRef<FlatList<ChatMessage>>(null);
+  const listRef = useRef<FlatList<TranscriptItem>>(null);
+
+  /* ── Team threads ──────────────────────────────────────────────────────
+     A thread answered by a team (mode AGENT_TEAM) reads its roster for the
+     specialists' names, folds their replies under the final answer, and
+     shows the latest run above the composer. A one-agent thread is
+     untouched by all of this. */
+  const canApprove = usePermission(AGENT_TEAM_PERMISSIONS.APPROVE);
+  const canCancelRun = usePermission(AGENT_TEAM_PERMISSIONS.CANCEL);
+  const isTeam = isTeamThread(conversation.thread);
+  const teamQuery = useGetAgentTeamQuery(conversation.thread?.agentTeamId ?? '', { skip: !isTeam });
+  const agentNames = useMemo(() => {
+    const names: Record<string, string> = {};
+    for (const m of teamQuery.data?.specialists ?? []) names[m.agentId] = m.name;
+    if (teamQuery.data?.supervisor) names[teamQuery.data.supervisor.agentId] = teamQuery.data.supervisor.name;
+    return names;
+  }, [teamQuery.data]);
+  const newest = conversation.messages[0];
+  const turnPending = Boolean(newest && (newest.role === 'USER' || (!newest.agentId && (newest.status === 'PENDING' || newest.status === 'STREAMING'))));
+  const teamRun = useTeamRun({ conversationId: params.conversationId, enabled: isTeam, turnPending, agentNames });
+  const [cancelRun, { isLoading: isCancellingRun }] = useCancelTeamRunMutation();
+  const [resolveInteraction, { isLoading: isResolving }] = useResolveTeamInteractionMutation();
+  /* One idempotency key per pause, kept across retries — a double tap on a
+     flaky connection resolves it once. */
+  const decisionKeys = useRef(new Map<string, string>());
+
+  /* The transcript, newest first for the inverted list. On a team thread the
+     grouping runs oldest-first (as web's does) and is then reversed. */
+  const items = useMemo<TranscriptItem[]>(() => {
+    if (!isTeam) return conversation.messages.map((m) => ({ kind: 'message', key: m.id, message: m }));
+    return groupTeamTranscript([...conversation.messages].reverse()).reverse();
+  }, [conversation.messages, isTeam]);
+
+  const handleDecide = async (decision: InteractionDecision) => {
+    if (!teamRun.runId) return;
+    const key = decisionKeys.current.get(decision.interactionId) ?? newIdempotencyKey();
+    decisionKeys.current.set(decision.interactionId, key);
+    try {
+      await resolveInteraction({ ...decision, runId: teamRun.runId, conversationId: params.conversationId, idempotencyKey: key }).unwrap();
+    } catch (err) {
+      const status = (err as { status?: number | string })?.status;
+      toast.show(status === 404 || status === 409 ? INTERACTION_COPY.alreadyMovedOn : INTERACTION_COPY.resolveFailed, { tone: status === 404 || status === 409 ? 'neutral' : 'error' });
+    }
+  };
+
+  const handleCancelRun = async () => {
+    if (!teamRun.runId) return;
+    try {
+      await cancelRun({ runId: teamRun.runId, conversationId: params.conversationId }).unwrap();
+    } catch (err) {
+      toast.show(getErrorMessage(err as never, 'Could not stop the run.'), { tone: 'error' });
+    }
+  };
+
+  const renderBubble = (message: ChatMessage, authorName?: string | null) => (
+    <MessageBubble
+      key={message.id}
+      message={message}
+      isOwnTurn={ownsTurn(message.id)}
+      canViewCost={canViewCost}
+      onRetry={() => handleRetry(message)}
+      onCopy={handleCopy}
+      authorName={authorName}
+    />
+  );
 
   // D-6: a swipe-back mid-generation would abandon a turn the user is
   // already paying for — Stop is the only cancel path while streaming.
@@ -198,6 +271,15 @@ export function ChatConversationScreen() {
               {thread.agentVersion !== null ? ` v${thread.agentVersion}` : ''}
             </Text>
           )}
+          {isTeam && (
+            <View style={styles.teamLine}>
+              <Icon name="groups" size={14} color={theme.colors.accent} />
+              <Text numberOfLines={1} style={{ color: theme.colors.textMuted, fontSize: 12, flexShrink: 1 }}>
+                {thread?.agentTeamName || 'Team'}
+                {teamQuery.data ? ` · ${teamQuery.data.specialists.length} agent${teamQuery.data.specialists.length === 1 ? '' : 's'}` : ''}
+              </Text>
+            </View>
+          )}
         </View>
         <TouchableOpacity
           onPress={() => navigation.navigate('ChatThreadDetails', { conversationId: params.conversationId })}
@@ -227,24 +309,36 @@ export function ChatConversationScreen() {
           message={getErrorMessage(conversation.messagesError)}
           onRetry={conversation.refetchMessages}
         />
+      ) : items.length === 0 && !conversation.hasMoreMessages ? (
+        /* Rendered OUTSIDE the transcript list on purpose. The list is
+           `inverted`: React Native flips the whole scroll view and then flips
+           each row back — but not `ListEmptyComponent`, which therefore drew
+           upside down and mirrored. */
+        <View style={styles.emptyFill}>
+          <EmptyState icon="chat-bubble-outline" title={NO_MESSAGES_TITLE} description={NO_MESSAGES_BODY} />
+        </View>
       ) : (
         <FlatList
           ref={listRef}
-          data={conversation.messages}
+          data={items}
           inverted
-          keyExtractor={(m) => m.id}
+          keyExtractor={(item) => item.key}
           contentContainerStyle={styles.transcript}
           keyboardShouldPersistTaps="handled"
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-          renderItem={({ item }) => (
-            <MessageBubble
-              message={item}
-              isOwnTurn={ownsTurn(item.id)}
-              canViewCost={canViewCost}
-              onRetry={() => handleRetry(item)}
-              onCopy={handleCopy}
-            />
-          )}
+          renderItem={({ item }) =>
+            item.kind === 'message' ? (
+              renderBubble(item.message)
+            ) : (
+              <SpecialistReplies
+                state={item.state}
+                count={item.messages.length}
+                names={item.messages.map((m) => (m.agentId && agentNames[m.agentId]) || 'A specialist')}
+              >
+                {item.messages.map((m) => renderBubble(m, (m.agentId && agentNames[m.agentId]) || 'Specialist'))}
+              </SpecialistReplies>
+            )
+          }
           ListFooterComponent={
             conversation.hasMoreMessages ? (
               <TouchableOpacity
@@ -258,9 +352,6 @@ export function ChatConversationScreen() {
               </TouchableOpacity>
             ) : null
           }
-          ListEmptyComponent={
-            <EmptyState icon="chat-bubble-outline" title={NO_MESSAGES_TITLE} description={NO_MESSAGES_BODY} />
-          }
         />
       )}
 
@@ -269,6 +360,28 @@ export function ChatConversationScreen() {
           <TypingDots showLabel={false} color={theme.colors.textMuted} />
           <Text style={{ color: theme.colors.textMuted, fontSize: 12 }}>{conversation.typingLabel}</Text>
         </View>
+      )}
+
+      {isTeam &&
+        teamRun.interactions.map((interaction) => (
+          <TeamInteractionCard key={interaction.id} interaction={interaction} canApprove={canApprove} isResolving={isResolving} onDecide={(d) => void handleDecide(d)} />
+        ))}
+
+      {isTeam && teamRun.runId && (
+        <TeamRunBand
+          phase={teamRun.phase}
+          isLive={teamRun.isLive}
+          rows={teamRun.rows}
+          teamSize={teamQuery.data?.specialists.length ?? teamRun.rows.length}
+          waitingName={teamRun.rows.find((r) => r.state === 'input')?.agentName ?? null}
+          startedAtMs={teamRun.startedAtMs}
+          endedAtMs={teamRun.endedAtMs}
+          tokensIn={teamRun.tokensIn}
+          tokensOut={teamRun.tokensOut}
+          canCancel={canCancelRun}
+          isCancelling={isCancellingRun}
+          onCancel={() => void handleCancelRun()}
+        />
       )}
 
       <SendQueueRail
@@ -314,7 +427,9 @@ function Banner({ tone, title, text }: { tone: 'info' | 'danger'; title?: string
 
 const styles = StyleSheet.create({
   subHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
+  teamLine: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  emptyFill: { flex: 1, justifyContent: 'center', paddingHorizontal: 16 },
   transcript: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, flexGrow: 1, justifyContent: 'flex-end' },
   loadEarlier: { alignSelf: 'center', paddingVertical: 10 },
   typingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingBottom: 4 },

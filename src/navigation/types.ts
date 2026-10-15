@@ -54,7 +54,11 @@ export type KnowledgeBasesStackParamList = {
 };
 
 export type ChatStackParamList = {
-  ChatHome: undefined;
+  /** `newTeamThread` arrives from Agents Teams ("New team chat", or a
+   * builder team's "Chat"): open on the Teams tab with the New thread form
+   * up on "A team of agents", `agentIds` pre-ticked. `nonce` makes a second
+   * tap with the same agents still open the form. */
+  ChatHome: { newTeamThread?: { agentIds?: string[]; nonce: number } } | undefined;
 };
 
 /** A conversation and everything opened from inside one — deliberately its
@@ -109,6 +113,36 @@ export type PlaygroundStackParamList = {
    * editor, rather than switching tabs. Same convention as Dashboard's and
    * Marketplace's own reuse of this screen. */
   AgentForm: { id?: string; initialPrompt?: string };
+};
+
+export type SurveysStackParamList = {
+  SurveysHome: undefined;
+  /** `title` only so the header has something to show before the read
+   * resolves; `tab` opens a given tab. */
+  SurveyDetail: { id: string; title?: string; tab?: 'overview' | 'details' | 'form' | 'targeting' | 'responses' };
+  SurveyWizard: undefined;
+  /** Create when the survey has no schedule, Edit when it has one. */
+  SurveyScheduleForm: { surveyId: string };
+};
+
+export type MySurveysStackParamList = {
+  MySurveysHome: undefined;
+  /** `title` only so the header has something before the read resolves. */
+  MySurveyFill: { assignmentId: string; title?: string };
+};
+
+export type AgentTeamsStackParamList = {
+  AgentTeamsHome: undefined;
+  /** `name` is passed through only so the header has something to show
+   * before `GET /agent-teams/:id` resolves. */
+  AgentTeamDetail: { id: string; name?: string };
+  /** No id = New team, id present = Edit team. */
+  AgentTeamForm: { id?: string };
+  AgentTeamAddMember: { teamId: string };
+  AgentTeamScheduleForm: { teamId: string };
+  /** A new team thread. `agentIds` preselects a builder team's agents —
+   * web's `/chat?team=<id>`; absent = "New team chat" with nobody picked. */
+  AgentTeamChat: { agentIds?: string[] } | undefined;
 };
 
 export type MarketplaceStackParamList = {
@@ -228,11 +262,14 @@ export type AppDrawerParamList = {
   CustomerAgents: NavigatorScreenParams<CustomerAgentsStackParamList> | undefined;
   KnowledgeBases: NavigatorScreenParams<KnowledgeBasesStackParamList> | undefined;
   Playground: NavigatorScreenParams<PlaygroundStackParamList> | undefined;
+  AgentTeams: NavigatorScreenParams<AgentTeamsStackParamList> | undefined;
   Customers: NavigatorScreenParams<CustomersStackParamList> | undefined;
   Leads: NavigatorScreenParams<LeadsStackParamList> | undefined;
   LeadCriteria: NavigatorScreenParams<LeadCriteriaStackParamList> | undefined;
   Reports: NavigatorScreenParams<ReportsStackParamList> | undefined;
   UsageSpend: undefined;
+  Surveys: NavigatorScreenParams<SurveysStackParamList> | undefined;
+  MySurveys: NavigatorScreenParams<MySurveysStackParamList> | undefined;
   /**
    * `from` is the drawer route that opened the bell, so Back returns to that
    * screen rather than wherever the drawer's own history happens to point.

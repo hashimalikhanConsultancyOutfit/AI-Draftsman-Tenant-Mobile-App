@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { DrawerActions, useNavigation } from '@react-navigation/native';
+import { DrawerActions, useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -39,6 +39,8 @@ import { ThreadActionsSheet } from './components/ThreadActionsSheet';
 import { NewThreadSheet } from './components/NewThreadSheet';
 import { RenameThreadSheet } from './components/RenameThreadSheet';
 import { SetKnowledgeBaseSheet } from './components/SetKnowledgeBaseSheet';
+import { ThreadKindTabs } from './components/ThreadKindTabs';
+import { KIND_EMPTY_COPY, threadsOfKind, type ThreadKind } from './teamChatRules';
 
 type Nav = NativeStackNavigationProp<ChatStackParamList>;
 
@@ -64,6 +66,26 @@ export function ChatScreen() {
   const [renameTarget, setRenameTarget] = useState<ChatThread | null>(null);
   const [kbTarget, setKbTarget] = useState<ChatThread | null>(null);
   const [newThreadOpen, setNewThreadOpen] = useState(false);
+  /* Web's "Chat" / "Teams" tabs over the thread list — one-agent threads and
+     team threads. No "All", as on web. */
+  const [kind, setKind] = useState<ThreadKind>('agent');
+  /* Agents pre-ticked when arriving from a builder team's "Chat". */
+  const [presetAgentIds, setPresetAgentIds] = useState<string[] | undefined>(undefined);
+
+  /* Arriving from Agents Teams ("New team chat" / a team's "Chat"): Teams
+     tab, New thread form open on "A team of agents" — web's `/chat` and
+     `/chat?team=`. The param is cleared once handled, so going back and
+     forth does not reopen the form. */
+  const route = useRoute<RouteProp<ChatStackParamList, 'ChatHome'>>();
+  const incoming = route.params?.newTeamThread;
+  useEffect(() => {
+    if (!incoming) return;
+    setKind('team');
+    setPresetAgentIds(incoming.agentIds);
+    setNewThreadOpen(true);
+    navigation.setParams({ newTeamThread: undefined });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incoming?.nonce]);
 
   const threadsQuery = useGetChatThreadsQuery({ status: 'ACTIVE' }, { skip: !canView });
   const archivedQuery = useGetChatThreadsQuery({ status: 'ARCHIVED' }, { skip: !canView });
@@ -79,7 +101,16 @@ export function ChatScreen() {
   const archivedThreads = archivedQuery.data?.items ?? [];
   // Every hook above runs unconditionally, including the two skippable
   // queries — only the RENDER branches on `canView`, never the hook order.
-  const groups = useMemo(() => groupThreads(activeThreads), [activeThreads]);
+  /* Counted from what is LOADED — the list API has no `mode` filter, so this
+     is the honest number (web counts the same way). */
+  const countsByKind = useMemo(
+    () => ({ agent: threadsOfKind(activeThreads, 'agent').length, team: threadsOfKind(activeThreads, 'team').length }),
+    [activeThreads],
+  );
+  const shownThreads = useMemo(() => threadsOfKind(activeThreads, kind), [activeThreads, kind]);
+  const shownArchived = useMemo(() => threadsOfKind(archivedThreads, kind), [archivedThreads, kind]);
+  const groups = useMemo(() => groupThreads(shownThreads), [shownThreads]);
+
 
   if (!canView) {
     return (
@@ -202,6 +233,8 @@ export function ChatScreen() {
         </TouchableOpacity>
       </View>
 
+      <ThreadKindTabs value={kind} counts={countsByKind} onChange={setKind} />
+
       {selectionMode && selectedIds.size > 0 && (
         <TouchableOpacity
           onPress={() => confirmDelete(selectedIds)}
@@ -226,7 +259,7 @@ export function ChatScreen() {
           Archived
         </Text>
         <View style={[styles.countPill, { backgroundColor: theme.colors.statusNeutralBg }]}>
-          <Text style={{ color: theme.colors.textMuted, fontSize: 12 }}>{archivedThreads.length}</Text>
+          <Text style={{ color: theme.colors.textMuted, fontSize: 12 }}>{shownArchived.length}</Text>
         </View>
         <Icon name={archivedOpen ? 'keyboard-arrow-down' : 'chevron-right'} size={20} color={theme.colors.textMuted} />
       </TouchableOpacity>
@@ -234,10 +267,10 @@ export function ChatScreen() {
       {archivedOpen && (
         <View style={{ gap: 8 }}>
           {archivedQuery.isLoading && <Loader />}
-          {!archivedQuery.isLoading && archivedThreads.length === 0 && (
+          {!archivedQuery.isLoading && shownArchived.length === 0 && (
             <EmptyState icon="archive" title={NO_ARCHIVED_TITLE} description={NO_ARCHIVED_BODY} />
           )}
-          {archivedThreads.map((thread) => (
+          {shownArchived.map((thread) => (
             <ThreadCard
               key={thread.id}
               thread={thread}
@@ -301,6 +334,16 @@ export function ChatScreen() {
               message={getErrorMessage(threadsQuery.error)}
               onRetry={threadsQuery.refetch}
             />
+          ) : activeThreads.length > 0 ? (
+            /* Threads exist, none of this kind: say which filter, and offer
+               the other tab with its count. */
+            <EmptyState
+              icon={kind === 'team' ? 'groups' : 'chat-bubble-outline'}
+              title={KIND_EMPTY_COPY[kind].title}
+              description={KIND_EMPTY_COPY[kind].body}
+              actionLabel={KIND_EMPTY_COPY[kind].switchTo(kind === 'team' ? countsByKind.agent : countsByKind.team)}
+              onAction={() => setKind(kind === 'team' ? 'agent' : 'team')}
+            />
           ) : (
             <EmptyState
               icon="chat-bubble-outline"
@@ -336,7 +379,12 @@ export function ChatScreen() {
       <NewThreadSheet
         visible={newThreadOpen}
         canManage={canManage}
-        onClose={() => setNewThreadOpen(false)}
+        initialAnsweredBy={kind}
+        initialAgentIds={presetAgentIds}
+        onClose={() => {
+          setNewThreadOpen(false);
+          setPresetAgentIds(undefined);
+        }}
         onCreated={(id) => navigateToConversation(navigation, { conversationId: id })}
       />
     </View>

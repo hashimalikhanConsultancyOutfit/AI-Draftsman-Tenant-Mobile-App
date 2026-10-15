@@ -4,6 +4,9 @@ import { NotificationsScreen } from '@/features/notifications/NotificationsScree
 import { UsageSpendScreen } from '@/features/usage-spend/UsageSpendScreen';
 
 import { AppTabs } from './AppTabs';
+import { AgentTeamsStack } from './stacks/AgentTeamsStack';
+import { MySurveysStack } from './stacks/MySurveysStack';
+import { SurveysStack } from './stacks/SurveysStack';
 import { SidebarContent } from './SidebarContent';
 import { ApiKeysStack } from './stacks/ApiKeysStack';
 import { BrandingStack } from './stacks/BrandingStack';
@@ -43,11 +46,14 @@ export function AppDrawer() {
       <Drawer.Screen name="CustomerAgents" component={CustomerAgentsStack} />
       <Drawer.Screen name="KnowledgeBases" component={KnowledgeBasesStack} />
       <Drawer.Screen name="Playground" component={PlaygroundStack} />
+      <Drawer.Screen name="AgentTeams" component={AgentTeamsStack} />
       <Drawer.Screen name="Customers" component={CustomersStack} />
       <Drawer.Screen name="Leads" component={LeadsStack} />
       <Drawer.Screen name="LeadCriteria" component={LeadCriteriaStack} />
       <Drawer.Screen name="Reports" component={ReportsStack} />
       <Drawer.Screen name="UsageSpend" component={UsageSpendScreen} />
+      <Drawer.Screen name="Surveys" component={SurveysStack} />
+      <Drawer.Screen name="MySurveys" component={MySurveysStack} />
       <Drawer.Screen name="Notifications" component={NotificationsScreen} />
       <Drawer.Screen name="ApiKeys" component={ApiKeysStack} />
       <Drawer.Screen name="Team" component={TeamStack} />

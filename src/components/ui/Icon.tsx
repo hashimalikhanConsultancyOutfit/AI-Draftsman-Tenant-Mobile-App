@@ -36,6 +36,10 @@ export const NAV_ICON_MAP = {
   customerAgents: 'groups',
   knowledgeBases: 'menu-book',
   playground: 'science',
+  /* Web's AccountTreeIcon — the same glyph. */
+  agentTeams: 'account-tree',
+  surveys: 'poll',
+  mySurveys: 'assignment',
   customers: 'business',
   leads: 'trending-up',
   leadCriteria: 'rule',

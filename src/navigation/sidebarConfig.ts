@@ -1,4 +1,6 @@
 import {
+  AGENT_TEAM_PERMISSIONS,
+  SURVEY_PERMISSIONS,
   BILLING_PERMISSIONS,
   BRANDING_PERMISSIONS,
   CLONE_PERMISSIONS,
@@ -87,6 +89,15 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
         icon: 'playground',
         permission: PLAYGROUND_PERMISSIONS.VIEW,
       },
+      {
+        /* Right after Playground, as on web — same label ("Agents Teams")
+           and subtitle as web's navigation.data.ts. */
+        route: 'AgentTeams',
+        label: 'Agents Teams',
+        subtitle: 'Several agents answering one thread together',
+        icon: 'agentTeams',
+        permission: AGENT_TEAM_PERMISSIONS.VIEW,
+      },
     ],
   },
   {
@@ -127,6 +138,25 @@ export const SIDEBAR_SECTIONS: SidebarSection[] = [
         subtitle: 'Consumption and cost breakdown',
         icon: 'usageAndSpend',
         permission: USAGE_PERMISSIONS.VIEW,
+      },
+      {
+        /* Right after Usage & spend — label and subtitle as web's
+           navigation.data.ts. */
+        route: 'Surveys',
+        label: 'Surveys',
+        subtitle: 'Build, target and review in-app surveys',
+        icon: 'surveys',
+        permission: SURVEY_PERMISSIONS.MANAGE,
+      },
+      {
+        /* The respondent's own screen — its own row, never a tab on Surveys,
+           as on web. `survey.respond` is seeded to every tenant user, so in
+           practice everyone sees it. */
+        route: 'MySurveys',
+        label: 'My Surveys',
+        subtitle: 'Surveys assigned to you',
+        icon: 'mySurveys',
+        permission: SURVEY_PERMISSIONS.RESPOND,
       },
     ],
   },

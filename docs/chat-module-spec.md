@@ -248,3 +248,80 @@ Known deliberate gaps, matching §4's divergence table: no markdown rendering
 (D-9), no dictation or camera capture (D-10/D-11), historic VOICE
 attachments play back but none can be newly recorded (D-12).
 
+
+---
+
+## Team chat (added 2026-10-15)
+
+Ported from the web portal's Chat (`features/Chat/chatThreadMode.ts`,
+`chatTeamRun.ts`, `teamMeter.ts`, `SpecialistReplies`, `TeamMeterBand`,
+`TeamStatusCard`, `InteractionBlock`, `TeamAttachMenu`) and checked live on
+`b2b-fe.aidraftsman.ai/chat` on 2026-10-15.
+
+### Thread list — Chat / Teams tabs
+- Two tabs above the list, `Chat {n}` and `Teams {n}`, as on web (no "All").
+  A team thread is `mode === 'AGENT_TEAM'` **and** has `agentTeamId`;
+  everything else (AGENT, SOCKET) is under Chat. Counts are of the LOADED
+  threads — the list API has no `mode` filter (web counts the same way).
+- Archived threads are filtered by the same tab.
+- A tab with nothing in it while the other has threads shows web's
+  "No team chats here" / "No one-agent chats here" with a "Show chats (n)" /
+  "Show teams (n)" action.
+- Team rows show the team name and a team icon.
+
+### New thread — "Answered by"
+- "One agent" / "A team of agents", defaulting to the tab it was opened from.
+- Team mode: Agents checklist (search, "n of 8 selected", unticked rows
+  disable at 8) — "Agents is required" / "Agents: pick at most 8".
+- `POST /conversations { title?, mode: 'AGENT_TEAM', agentIds, knowledgeBaseId? }`.
+
+### Conversation — team threads
+- Sub-header shows the team name and its agent count.
+- Specialist replies (messages WITH `agentId`) are folded under the final
+  answer (the message with NO `agentId`): "Based on N specialist replies" +
+  "Show/Hide N specialist replies"; while the answer is being written:
+  "{who} has/have finished. The team is preparing the final response."; if
+  the answer failed it starts open ("The final answer did not finish · …").
+  Each specialist reply is labelled with its agent's name.
+- Run band above the composer for the latest run (`GET /agent-team-runs?conversationId`):
+  web's headline/subline ("Team finished", "2 agents are working",
+  "The team lead answered directly · the answer is in the chat", …), run
+  clock, `↑ in · ↓ out` tokens ("this run" / "this run so far"), and one row
+  per agent (Working · m:ss / Up next / Needs an answer / Done / Couldn't
+  finish) built from the run's events. Open while live, closed once settled.
+  "Stop run" (`agent_team.cancel`) while live.
+- Live updates: polls the run every 3 s while live (web's `RUN_POLL_MS`) and
+  refetches at once on a `team:run:event` socket frame for the thread.
+- A paused run (`interactions` with status OPEN) shows web's approval card:
+  one button per offered resolution + decline ("Stop this run" / "Skip this
+  task and continue"), gated on `agent_team.approve`. `CREATE_AGENT` opens
+  web's agent builder; mobile says it is done on the web portal.
+
+### Thread details — team threads
+- Model: "Team threads use each agent's own model. Each reply shows the
+  model that wrote it."
+- "Attached to this team" replaces the single knowledge base: knowledge
+  bases and connectors, each tick PATCHing `/agent-teams/:id`
+  (`knowledgeBaseIds` / `connectorInstallIds`, replaced wholesale), gated on
+  `agent_team.build`.
+- Team run: the latest run's agents and their state, the ones "not needed
+  for this question" (Idle), tokens and run cost (cost needs `usage.view`).
+- Runs in this thread: one row per run — status, date, duration, cost.
+
+### Not ported
+- Web's "This run over time" / tokens-by-agent / tokens-by-model charts and
+  the "show in band" lane pinning — the run band and the details screen
+  carry the same facts as lists.
+- Web groups ALL threads' agent-attributed replies; on a one-agent thread
+  that hides every answer behind "A specialist has finished…" (seen live on
+  the "AI model" thread). Mobile groups team threads only.
+
+## New thread form — aligned with web (2026-10-15)
+Matches web's `NEW_THREAD_FIELDS` / `useChat` modal config:
+- **Thread name** (optional), placeholder "e.g. Barrow Foods · returns policy", hint "Optional — leave it blank and the first message names the thread."
+- **Answered by \*** — a select: One agent / A team of agents (defaults to the list tab it was opened from).
+- **Agent \*** — a searchable select ("Search agents…"), preselected to the first usable agent. Every agent is listed; non-deployed ones are disabled with the reason (not evaluated / archived / not deployed). If the list fails: "Could not load the agent list. The thread cannot be created until it loads — …".
+- **Agents \*** (team) — the SAME options and rule, as a searchable checklist, max 8, "n of 8 selected" always shown.
+- **Knowledge base** — a select led by "No knowledge base"; hint by state: "Optional — scope this thread to a knowledge base." / "You have no knowledge bases yet — …" / "Could not load your knowledge bases. …".
+- Footer **Cancel / Create thread**. Success toast `Thread “{name}” created.`; failure shows the server's message, else "Could not save that thread."
+Shared: `PickerField` options can be `disabled`, and it takes `searchPlaceholder`; `AgentChecklistField` options can be `disabled` with a `hint` line.

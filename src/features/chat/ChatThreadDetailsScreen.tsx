@@ -3,12 +3,13 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { AppHeader } from '@/components/shell/AppHeader';
 import { Card, EmptyState, ErrorState, Icon, Loader, useToast } from '@/components/ui';
 import { useGetAllKnowledgeBasesQuery } from '@/features/knowledge-bases/knowledgeBasesApi';
-import { CHAT_PERMISSIONS, USAGE_PERMISSIONS } from '@/permissions/slugs';
+import { useGetAgentTeamQuery } from '@/features/agent-teams/agentTeamsApi';
+import { AGENT_TEAM_PERMISSIONS, CHAT_PERMISSIONS, USAGE_PERMISSIONS } from '@/permissions/slugs';
 import { usePermission } from '@/permissions/usePermission';
 import { getErrorMessage } from '@/services/apiErrorMessage';
 import type { ApiQueryError } from '@/store/baseQuery';
@@ -32,6 +33,19 @@ import {
   useSetChatThreadModelMutation,
 } from './chatApi';
 import { SetKnowledgeBaseSheet } from './components/SetKnowledgeBaseSheet';
+import { TeamAttachSheet } from './components/TeamAttachSheet';
+import {
+  RUN_STATUS_LABEL,
+  TEAM_DETAILS_COPY,
+  agentStateLabel,
+  formatClock,
+  formatTokens,
+  isTeamThread,
+  microCentsToCents,
+  runHeadline,
+} from './teamChatRules';
+import { useGetThreadTeamRunsQuery } from './teamRunApi';
+import { useTeamRun } from './useTeamRun';
 
 type Nav = NativeStackNavigationProp<ChatConversationStackParamList>;
 type Rt = RouteProp<ChatConversationStackParamList, 'ChatThreadDetails'>;
@@ -61,6 +75,8 @@ export function ChatThreadDetailsScreen() {
   const canViewCost = usePermission(USAGE_PERMISSIONS.VIEW);
 
   const [kbSheetOpen, setKbSheetOpen] = useState(false);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const canEditTeam = usePermission(AGENT_TEAM_PERMISSIONS.BUILD);
 
   const threadQuery = useGetChatThreadQuery(params.conversationId, { skip: !canView });
   const modelsQuery = useGetChatModelsQuery(params.conversationId, { skip: !canView });
@@ -69,6 +85,15 @@ export function ChatThreadDetailsScreen() {
   const [setModel, { isLoading: isSettingModel }] = useSetChatThreadModelMutation();
 
   const thread = threadQuery.data;
+
+  /* ── Team threads: the team, its latest run, and every run ──────────── */
+  const isTeam = isTeamThread(thread);
+  const teamQuery = useGetAgentTeamQuery(thread?.agentTeamId ?? '', { skip: !isTeam });
+  const team = teamQuery.data;
+  const agentNames = useMemo(() => Object.fromEntries((team?.specialists ?? []).map((m) => [m.agentId, m.name])), [team]);
+  const teamRun = useTeamRun({ conversationId: params.conversationId, enabled: isTeam, turnPending: false, agentNames });
+  const runsQuery = useGetThreadTeamRunsQuery({ conversationId: params.conversationId }, { skip: !isTeam });
+  const notNeeded = (team?.specialists ?? []).filter((m) => !teamRun.rows.some((r) => r.agentId === m.agentId));
   const knowledgeBaseName = thread?.knowledgeBaseId
     ? (kbQuery.data ?? []).find((kb) => kb.id === thread.knowledgeBaseId)?.name ?? 'Assigned'
     : 'None';
@@ -140,12 +165,23 @@ export function ChatThreadDetailsScreen() {
               {thread.agentDeleted ? ' · deleted' : ''}
             </Text>
           )}
+          {isTeam && (
+            <Text style={{ color: theme.colors.textMuted, fontSize: 13, marginTop: 4 }}>
+              {thread.agentTeamName || 'Team'}
+              {team ? ` · ${team.specialists.length} agent${team.specialists.length === 1 ? '' : 's'}` : ''}
+            </Text>
+          )}
           <Text style={{ color: theme.colors.textMuted, fontSize: 12, marginTop: 6 }}>
             {thread.purpose === 'SUPPORT' ? 'Support conversation' : 'General conversation'} · {thread.messageCount} messages
           </Text>
         </Card>
 
         <SectionLabel text="MODEL" />
+        {isTeam ? (
+          <Card elevated>
+            <Text style={{ color: theme.colors.textMuted, fontSize: 13, lineHeight: 19 }}>{TEAM_DETAILS_COPY.model}</Text>
+          </Card>
+        ) : (
         <Card elevated padded={false} style={{ borderRadius: theme.radii.xl, overflow: 'hidden' }}>
           <View style={[styles.row, { paddingVertical: 14 }]}>
             <Icon name="smart-toy" size={16} color={theme.colors.accent} />
@@ -200,6 +236,88 @@ export function ChatThreadDetailsScreen() {
           )}
         </Card>
 
+        )}
+
+        {isTeam ? (
+          <>
+            <SectionLabel text={TEAM_DETAILS_COPY.attachedLabel} />
+            <Card elevated padded={false} style={{ borderRadius: theme.radii.xl, overflow: 'hidden' }}>
+              <TouchableOpacity disabled={!team} onPress={() => setAttachOpen(true)} style={[styles.row, { paddingVertical: 14 }]}>
+                <Icon name="attach-file" size={16} color={theme.colors.accent} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: theme.colors.text, fontSize: 14.5 }}>
+                    {TEAM_DETAILS_COPY.knowledge}: {TEAM_DETAILS_COPY.attachedCount(team?.knowledgeBaseIds.length ?? 0)}
+                  </Text>
+                  <Text style={{ color: theme.colors.text, fontSize: 14.5, marginTop: 2 }}>
+                    {TEAM_DETAILS_COPY.connectors}: {TEAM_DETAILS_COPY.attachedCount(team?.connectorInstallIds.length ?? 0)}
+                  </Text>
+                </View>
+                <Icon name="chevron-right" size={18} color={theme.colors.textMuted} />
+              </TouchableOpacity>
+            </Card>
+
+            <SectionLabel text={TEAM_DETAILS_COPY.runLabel} />
+            <Card elevated>
+              {!teamRun.runId ? (
+                <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>{TEAM_DETAILS_COPY.noRuns}</Text>
+              ) : (
+                <View style={{ gap: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.body.semibold, fontSize: 14, flex: 1 }}>
+                      {runHeadline({ phase: teamRun.phase, rows: teamRun.rows, teamSize: team?.specialists.length ?? 0, waitingName: null })}
+                    </Text>
+                    <Text style={{ color: theme.colors.textMuted, fontSize: 11 }}>{TEAM_DETAILS_COPY.onQuestion(teamRun.rows.length, team?.specialists.length ?? teamRun.rows.length)}</Text>
+                  </View>
+                  <Text style={{ color: theme.colors.textMuted, fontFamily: theme.fontFamilies.mono.regular, fontSize: 12 }}>
+                    ↑ {formatTokens(teamRun.tokensIn)} · ↓ {formatTokens(teamRun.tokensOut)}
+                    {canViewCost && teamRun.costMicroCents !== null ? ` · ${formatMoneyCents(microCentsToCents(teamRun.costMicroCents))}` : ''}
+                  </Text>
+                  {teamRun.rows.map((row) => (
+                    <View key={row.agentId} style={styles.agentRow}>
+                      <Text style={{ color: theme.colors.text, fontSize: 13, flex: 1 }} numberOfLines={1}>{row.agentName ?? 'Specialist'}</Text>
+                      <Text style={{ color: row.state === 'failed' ? theme.colors.error : theme.colors.textMuted, fontSize: 12 }}>{agentStateLabel(row.state)}</Text>
+                    </View>
+                  ))}
+                  {teamRun.rows.length > 0 && notNeeded.length > 0 && (
+                    <Text style={[styles.sectionTitle, { color: theme.colors.textMuted, marginLeft: 0, marginTop: 4 }]}>{TEAM_DETAILS_COPY.notNeeded(notNeeded.length)}</Text>
+                  )}
+                  {(teamRun.rows.length > 0 ? notNeeded : team?.specialists ?? []).map((m) => (
+                    <View key={m.agentId} style={styles.agentRow}>
+                      <Text style={{ color: theme.colors.textMuted, fontSize: 13, flex: 1 }} numberOfLines={1}>{m.name}</Text>
+                      <Text style={{ color: theme.colors.textMuted, fontSize: 12 }}>{agentStateLabel('idle')}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </Card>
+
+            <SectionLabel text={TEAM_DETAILS_COPY.runsLabel} />
+            <Card elevated padded={false} style={{ borderRadius: theme.radii.xl, overflow: 'hidden' }}>
+              {(runsQuery.data?.items ?? []).length === 0 ? (
+                <View style={{ padding: 16 }}>
+                  <Text style={{ color: theme.colors.textMuted, fontSize: 13 }}>{runsQuery.isLoading ? 'Loading…' : TEAM_DETAILS_COPY.noRuns}</Text>
+                </View>
+              ) : (
+                (runsQuery.data?.items ?? []).map((run, index, all) => {
+                  const start = run.startedAt ? Date.parse(run.startedAt) : NaN;
+                  const end = run.finishedAt ? Date.parse(run.finishedAt) : NaN;
+                  const duration = Number.isFinite(start) && Number.isFinite(end) ? formatClock(end - start) : '—';
+                  const when = run.startedAt ? new Date(run.startedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '';
+                  return (
+                    <DetailRow
+                      key={run.id}
+                      icon={run.status === 'SUCCEEDED' ? 'check-circle' : run.status === 'FAILED' || run.status === 'TIMED_OUT' ? 'error-outline' : 'autorenew'}
+                      label={`RUN ${all.length - index} · ${when.toUpperCase()}`}
+                      value={`${RUN_STATUS_LABEL[run.status] ?? run.status} · ${duration}${canViewCost && run.costMicroCents !== null ? ` · ${formatMoneyCents(microCentsToCents(run.costMicroCents))}` : ''}`}
+                      last={index === all.length - 1}
+                    />
+                  );
+                })
+              )}
+            </Card>
+          </>
+        ) : (
+          <>
         <SectionLabel text="KNOWLEDGE BASE" />
         <Card elevated padded={false} style={{ borderRadius: theme.radii.xl, overflow: 'hidden' }}>
           <TouchableOpacity
@@ -217,6 +335,9 @@ export function ChatThreadDetailsScreen() {
             {canManage && <Icon name="chevron-right" size={18} color={theme.colors.textMuted} />}
           </TouchableOpacity>
         </Card>
+
+          </>
+        )}
 
         <SectionLabel text="RETENTION" />
         <Card elevated padded={false} style={{ borderRadius: theme.radii.xl, overflow: 'hidden' }}>
@@ -272,6 +393,16 @@ export function ChatThreadDetailsScreen() {
       </ScrollView>
 
       {kbSheetOpen && <SetKnowledgeBaseSheet thread={thread} onClose={() => setKbSheetOpen(false)} />}
+      {isTeam && team && (
+        <TeamAttachSheet
+          visible={attachOpen}
+          teamId={team.id}
+          knowledgeBaseIds={team.knowledgeBaseIds}
+          connectorInstallIds={team.connectorInstallIds}
+          canEdit={canEditTeam}
+          onClose={() => setAttachOpen(false)}
+        />
+      )}
     </View>
   );
 }
@@ -318,5 +449,6 @@ const styles = StyleSheet.create({
   container: { padding: 16, gap: 16 },
   sectionTitle: { fontFamily: 'InstrumentSans_600SemiBold', fontSize: 12, letterSpacing: 0.6, marginLeft: 2 },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 12 },
+  agentRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   modelOption: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, padding: 10 },
 });
