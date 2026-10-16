@@ -117,6 +117,24 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
 
   plugins: [
+    /*
+     * Android release optimisation — Play Console flagged "DEX code
+     * optimization is below our threshold" (obfuscation 2%, fix by Feb 2027).
+     * R8 minifies, obfuscates and shrinks the Java/Kotlin code of release
+     * builds only; debug builds and the JS bundle are untouched. React
+     * Native and Expo modules ship their own keep rules, so no app-level
+     * rules are needed today — add to `extraProguardRules` if a release build
+     * ever crashes with a ClassNotFound/NoSuchMethod that debug does not.
+     */
+    [
+      'expo-build-properties',
+      {
+        android: {
+          enableMinifyInReleaseBuilds: true,
+          enableShrinkResourcesInReleaseBuilds: true,
+        },
+      },
+    ],
     'expo-secure-store',
     'expo-font',
     'expo-web-browser',

@@ -602,3 +602,11 @@ export const teamSummaryRows = (team: TmTeamWire): Array<{ label: string; value:
     value: `${team.chats} chats · ${team.runs.total} runs${team.runs.failed > 0 ? ` (${team.runs.failed} did not succeed)` : ''}`,
   },
 ];
+
+/** Up to two initials for a member avatar — "Test Links" → "TL". */
+export const memberInitials = (name: string): string => {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return '?';
+  const letters = words.length === 1 ? words[0]!.slice(0, 2) : `${words[0]![0]}${words[words.length - 1]![0]}`;
+  return letters.toUpperCase();
+};

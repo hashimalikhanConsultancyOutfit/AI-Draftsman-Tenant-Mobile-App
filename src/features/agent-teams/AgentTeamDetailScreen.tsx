@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppHeader } from '@/components/shell/AppHeader';
-import { Button, Card, EmptyState, ErrorState, Icon, Loader, StatusTabs, useToast } from '@/components/ui';
+import { Button, EmptyState, ErrorState, Icon, Loader, useToast } from '@/components/ui';
+import { formatRelativeTime } from '@/utils/format';
 import type { AgentTeamsStackParamList } from '@/navigation/types';
 import { AGENT_TEAM_PERMISSIONS } from '@/permissions/slugs';
 import { usePermission } from '@/permissions/usePermission';
@@ -25,17 +26,15 @@ import {
 import { MEMBER_COPY, SCHEDULE_COPY, detailChatLabel, hierarchyRows, teamChatTarget, toAgentTeamRow } from './agentTeamsRules';
 import { MemberCard } from './components/MemberCard';
 import { ScheduleCard } from './components/ScheduleCard';
+import { ReportingLine } from './components/ReportingLine';
 import { TagChip } from './components/TagChip';
+import { UnderlineTabs } from './components/UnderlineTabs';
 import { openNewTeamChat, openTeamConversation } from './openTeamConversation';
 
 type Nav = NativeStackNavigationProp<AgentTeamsStackParamList>;
 type Rt = RouteProp<AgentTeamsStackParamList, 'AgentTeamDetail'>;
 type Tab = 'members' | 'schedules';
 
-const TABS = [
-  { value: 'members', label: 'Members' },
-  { value: 'schedules', label: 'Schedules' },
-];
 
 /**
  * One team — web's `AgentTeamBuilder` (`/agent-teams/:id`): a header with
@@ -164,12 +163,25 @@ export function AgentTeamDetailScreen() {
 
   const schedules = schedulesQuery.data ?? [];
 
+  const activeCount = team.specialists.filter((m) => m.enabled).length;
+
+  const sectionHeader = (title: string, subtitle: string, action?: ReactNode) => (
+    <View style={styles.sectionHeader}>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text, fontFamily: theme.fontFamilies.display.semibold }]}>{title}</Text>
+        <Text style={{ color: theme.colors.textMuted, fontFamily: theme.fontFamilies.body.regular, fontSize: theme.fontSizes.xs, marginTop: 2 }}>{subtitle}</Text>
+      </View>
+      {action}
+    </View>
+  );
+
   const membersTab = (
     <>
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text, fontFamily: theme.fontFamilies.display.semibold }]}>Members</Text>
-        {canBuild && <Button label="Add specialist" icon="add" size="sm" variant="outline" onPress={() => navigation.navigate('AgentTeamAddMember', { teamId: team.id })} />}
-      </View>
+      {sectionHeader(
+        'Specialists',
+        team.specialists.length === 0 ? 'No one answers for this team yet.' : `${activeCount} of ${team.specialists.length} active`,
+        canBuild ? <Button label="Add" icon="person-add" size="sm" onPress={() => navigation.navigate('AgentTeamAddMember', { teamId: team.id })} /> : undefined,
+      )}
 
       {team.specialists.length === 0 ? (
         <EmptyState icon="group-add" title={MEMBER_COPY.emptyTitle} description={MEMBER_COPY.emptyDescription} />
@@ -186,44 +198,19 @@ export function AgentTeamDetailScreen() {
         ))
       )}
 
-      <Text style={[styles.sectionTitle, { color: theme.colors.text, fontFamily: theme.fontFamilies.display.semibold, marginTop: 8 }]}>Reporting line</Text>
-      <Card style={{ gap: 10 }}>
-        {hierarchy.length === 0 ? (
-          <Text style={{ color: theme.colors.textMuted, fontSize: theme.fontSizes.sm }}>Nobody on this team yet.</Text>
-        ) : (
-          hierarchy.map((row) => (
-            <View key={`${row.role}:${row.agentId}`} style={[styles.hierarchyRow, row.role === 'SPECIALIST' && styles.hierarchyChild]}>
-              {row.role === 'SPECIALIST' && <Icon name="subdirectory-arrow-right" size={16} color={theme.colors.textMuted} />}
-              <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-                <View style={styles.hierarchyName}>
-                  <Text
-                    style={{
-                      color: theme.colors.text,
-                      fontFamily: row.role === 'SUPERVISOR' ? theme.fontFamilies.body.semibold : theme.fontFamilies.body.regular,
-                      fontSize: theme.fontSizes.sm,
-                      flexShrink: 1,
-                    }}
-                  >
-                    {row.name}
-                  </Text>
-                  {row.role === 'SUPERVISOR' && <TagChip label="coordinator" tone="info" outlined />}
-                  {/* A disabled member stays in the diagram — it is still on the revision. */}
-                  {!row.enabled && <TagChip label="disabled" />}
-                </View>
-                {row.capabilities.length > 0 && <Text style={{ color: theme.colors.textMuted, fontSize: 11 }}>{row.capabilities.join(' · ')}</Text>}
-              </View>
-            </View>
-          ))
-        )}
-      </Card>
+      <View style={{ marginTop: 8 }}>{sectionHeader('Reporting line', 'Who plans the work and who answers')}</View>
+      <ReportingLine teamName={team.name} rows={hierarchy} />
     </>
   );
 
   const schedulesTab = (
     <>
       <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text, fontFamily: theme.fontFamilies.display.semibold }]}>{SCHEDULE_COPY.title}</Text>
-        {canSchedule && <Button label="Add schedule" icon="add" size="sm" variant="outline" onPress={() => navigation.navigate('AgentTeamScheduleForm', { teamId: team.id })} />}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text, fontFamily: theme.fontFamilies.display.semibold }]}>{SCHEDULE_COPY.title}</Text>
+          <Text style={{ color: theme.colors.textMuted, fontFamily: theme.fontFamilies.body.regular, fontSize: theme.fontSizes.xs, marginTop: 2 }}>Runs this team on its own, on a timetable</Text>
+        </View>
+        {canSchedule && <Button label="Add" icon="event" size="sm" onPress={() => navigation.navigate('AgentTeamScheduleForm', { teamId: team.id })} />}
       </View>
 
       {schedulesQuery.isLoading ? (
@@ -275,22 +262,53 @@ export function AgentTeamDetailScreen() {
           />
         }
       >
-        <View style={styles.headerRow}>
-          <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
-            <View style={styles.headerName}>
-              <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.display.semibold, fontSize: theme.fontSizes.lg, flexShrink: 1 }}>{team.name}</Text>
-              {team.origin === 'THREAD' && <TagChip label="From chat" tone="info" outlined />}
+        {/* Header card — identity, purpose, the numbers, and the one action. */}
+        <View style={[styles.hero, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.xl }]}>
+          <View style={styles.heroTop}>
+            <View style={[styles.heroIcon, { backgroundColor: team.origin === 'THREAD' ? theme.colors.statusInfoBg : theme.colors.accent + '1A', borderRadius: theme.radii.lg }]}>
+              <Icon name={team.origin === 'THREAD' ? 'forum' : 'account-tree'} size={24} color={team.origin === 'THREAD' ? theme.colors.statusInfoFg : theme.colors.accent} />
             </View>
-            <Text style={{ color: theme.colors.textMuted, fontSize: theme.fontSizes.xs }}>Revision {team.currentRevision}</Text>
+            <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.display.semibold, fontSize: theme.fontSizes.xl }} numberOfLines={2}>
+                {team.name}
+              </Text>
+              <TagChip label={team.origin === 'THREAD' ? 'From a team chat' : 'Built on the Teams page'} tone={team.origin === 'THREAD' ? 'info' : 'neutral'} />
+            </View>
           </View>
-          <Button label={detailChatLabel(team.origin)} icon="chat-bubble-outline" variant="outline" size="sm" onPress={handleChat} />
+
+          {team.purpose && team.purpose !== team.name ? (
+            <Text style={{ color: theme.colors.textMuted, fontFamily: theme.fontFamilies.body.regular, fontSize: theme.fontSizes.sm, lineHeight: 20 }}>{team.purpose}</Text>
+          ) : null}
+
+          <View style={[styles.metrics, { backgroundColor: theme.colors.statusNeutralBg, borderColor: theme.colors.border, borderRadius: theme.radii.md }]}>
+            {[
+              { label: 'SPECIALISTS', value: `${activeCount}/${team.specialists.length}`, icon: 'smart-toy' as const },
+              { label: 'REVISION', value: `v${team.currentRevision}` },
+              { label: 'UPDATED', value: formatRelativeTime(team.updatedAt) },
+            ].map((m, i) => (
+              <View key={m.label} style={[styles.metric, i > 0 && { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: theme.colors.border, paddingLeft: 12 }]}>
+                <Text style={[styles.metricLabel, { color: theme.colors.textMuted }]}>{m.label}</Text>
+                <View style={styles.metricRow}>
+                  {m.icon ? <Icon name={m.icon} size={14} color={theme.colors.textMuted} /> : null}
+                  <Text style={[styles.metricValue, { color: theme.colors.text }]} numberOfLines={1}>
+                    {m.value}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+
+          <Button label={detailChatLabel(team.origin)} icon="chat-bubble-outline" onPress={handleChat} fullWidth />
         </View>
 
-        {team.purpose && team.purpose !== team.name ? (
-          <Text style={{ color: theme.colors.textMuted, fontFamily: theme.fontFamilies.body.regular, fontSize: theme.fontSizes.sm, lineHeight: 20 }}>{team.purpose}</Text>
-        ) : null}
-
-        <StatusTabs tabs={TABS} value={tab} onChange={(v) => setTab(v as Tab)} />
+        <UnderlineTabs
+          tabs={[
+            { value: 'members' as Tab, label: 'Members', count: team.specialists.length },
+            { value: 'schedules' as Tab, label: 'Schedules', ...(schedulesQuery.data ? { count: schedules.length } : {}) },
+          ]}
+          value={tab}
+          onChange={setTab}
+        />
 
         {tab === 'members' ? membersTab : schedulesTab}
       </ScrollView>
@@ -299,13 +317,16 @@ export function AgentTeamDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { padding: 16, gap: 12 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  headerName: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  sectionTitle: { fontSize: 15 },
-  hierarchyRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
-  hierarchyChild: { paddingLeft: 8 },
-  hierarchyName: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  container: { padding: 16, gap: 14 },
+  hero: { borderWidth: StyleSheet.hairlineWidth, padding: 16, gap: 14 },
+  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  heroIcon: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center' },
+  metrics: { flexDirection: 'row', borderWidth: StyleSheet.hairlineWidth, paddingVertical: 10, paddingHorizontal: 12, gap: 12 },
+  metric: { flex: 1, gap: 3 },
+  metricRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  metricLabel: { fontFamily: 'InstrumentSans_700Bold', fontSize: 10, letterSpacing: 0.4 },
+  metricValue: { fontFamily: 'InstrumentSans_600SemiBold', fontSize: 13 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 4 },
+  sectionTitle: { fontSize: 17 },
   callout: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 12 },
 });

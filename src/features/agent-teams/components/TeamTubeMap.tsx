@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState, ErrorState, Icon, Loader, TextField } from '@/components/ui';
@@ -8,10 +8,11 @@ import { useAppTheme } from '@/theme/ThemeContext';
 import { useGetAgentTeamMapQuery } from '../agentTeamsApi';
 import { TEAM_STAGES, TUBE_COPY, buildTubeModel, filterTubeLines, type TubeLine } from '../agentTeamsRules';
 import { TagChip } from './TagChip';
+import { lineColour } from '../metroLayout';
+import { MetroMap } from './MetroMap';
 import { TubeDetailSheet, type TubeSelection } from './TubeDetailSheet';
 
 /** One colour per line, cycled — the tube map's line colours. */
-const LINE_COLOURS = ['#C8622A', '#1E4DA8', '#2E9E5B', '#8A5A00', '#9B2042', '#1A3050', '#6D2B07', '#5B3FA8'];
 
 interface TeamTubeMapProps {
   /** The screen's own header block (the Team list / Tube map toggle). */
@@ -34,13 +35,20 @@ export function TeamTubeMap({ header, onOpenTeam }: TeamTubeMapProps) {
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
   const [selection, setSelection] = useState<TubeSelection>(null);
+  /* The followed line: highlighted on the map, and the only card below. */
+  const [focusLineId, setFocusLineId] = useState<string | null>(null);
+  const [fullScreen, setFullScreen] = useState(false);
+  const { height: winH } = useWindowDimensions();
 
   const { data, isLoading, isFetching, isError, refetch } = useGetAgentTeamMapQuery(undefined, { refetchOnMountOrArgChange: true });
 
   const model = useMemo(() => (data ? buildTubeModel(data.teams ?? []) : null), [data]);
   const linesById = useMemo(() => new Map((model?.lines ?? []).map((l) => [l.id, l])), [model]);
   const lines = useMemo(() => filterTubeLines(model?.lines ?? [], search), [model, search]);
-  const colourOf = (lineId: string) => LINE_COLOURS[Math.max(0, (model?.lines ?? []).findIndex((l) => l.id === lineId)) % LINE_COLOURS.length] ?? LINE_COLOURS[0]!;
+  /* Same colour per team on the map, the legend and the cards. */
+  const colourOf = (lineId: string) => lineColour(Math.max(0, (model?.lines ?? []).findIndex((l) => l.id === lineId)));
+  const shownLines = focusLineId ? lines.filter((l) => l.id === focusLineId) : lines;
+  const toggleFocus = (id: string) => setFocusLineId((cur) => (cur === id ? null : id));
 
   const renderLine = (line: TubeLine) => {
     const colour = colourOf(line.id);
@@ -118,11 +126,90 @@ export function TeamTubeMap({ header, onOpenTeam }: TeamTubeMapProps) {
   } else {
     content = (
       <>
-        <TextField placeholder={TUBE_COPY.searchPlaceholder} leftIcon="search" value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} />
-        <Text style={{ color: theme.colors.textMuted, fontSize: theme.fontSizes.xs, lineHeight: 17 }}>
-          {TUBE_COPY.stationHint} {TUBE_COPY.dashedMeaning}
-        </Text>
-        {lines.length === 0 ? <EmptyState icon="search-off" title="No matches" description={TUBE_COPY.noMatches} /> : lines.map(renderLine)}
+        {/* The drawn map — the shape of every team at a glance. */}
+        <View style={[styles.mapCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderRadius: theme.radii.xl }]}>
+          <View style={styles.mapHead}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.display.semibold, fontSize: theme.fontSizes.md }}>Metro map</Text>
+              <Text style={{ color: theme.colors.textMuted, fontSize: theme.fontSizes.xs, marginTop: 2 }}>
+                {model!.lines.length} team{model!.lines.length === 1 ? '' : 's'} · each line runs left to right
+              </Text>
+            </View>
+            <TouchableOpacity onPress={() => setFullScreen(true)} style={[styles.fsBtn, { borderColor: theme.colors.border, borderRadius: theme.radii.md }]} accessibilityRole="button" accessibilityLabel="Open the map full screen">
+              <Icon name="open-in-full" size={16} color={theme.colors.text} />
+              <Text style={{ color: theme.colors.text, fontFamily: theme.fontFamilies.body.semibold, fontSize: 12 }}>Full screen</Text>
+            </TouchableOpacity>
+          </View>
+          <MetroMap
+            model={model!}
+            focusLineId={focusLineId}
+            height={340}
+            onPressStation={(station) => setSelection({ kind: 'station', station })}
+            onPressLine={toggleFocus}
+          />
+
+          {/* Legend — tap a team to follow its line. */}
+          <Text style={[styles.legendTitle, { color: theme.colors.textMuted, fontFamily: theme.fontFamilies.body.semibold }]}>FOLLOW A TEAM</Text>
+          <View style={styles.legend}>
+            {model!.lines.map((l) => {
+              const on = focusLineId === l.id;
+              const colour = colourOf(l.id);
+              return (
+                <TouchableOpacity
+                  key={l.id}
+                  onPress={() => toggleFocus(l.id)}
+                  style={[styles.legendChip, { borderColor: on ? colour : theme.colors.border, backgroundColor: on ? colour + '1A' : theme.colors.surface, borderRadius: theme.radii.full }]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  accessibilityLabel={`${on ? 'Stop following' : 'Follow'} ${l.name}`}
+                >
+                  <View style={[styles.legendSwatch, { backgroundColor: colour }]} />
+                  <Text style={{ color: theme.colors.text, fontFamily: on ? theme.fontFamilies.body.semibold : theme.fontFamilies.body.medium, fontSize: 12 }} numberOfLines={1}>
+                    {l.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Key */}
+          <View style={[styles.key, { borderTopColor: theme.colors.border }]}>
+            <View style={styles.keyItem}>
+              <View style={[styles.keyDot, { borderColor: theme.colors.text }]} />
+              <Text style={[styles.keyText, { color: theme.colors.textMuted }]}>One team</Text>
+            </View>
+            <View style={styles.keyItem}>
+              <View style={[styles.keyPill, { borderColor: theme.colors.text }]} />
+              <Text style={[styles.keyText, { color: theme.colors.textMuted }]}>Shared by 2–4</Text>
+            </View>
+            <View style={styles.keyItem}>
+              <View style={[styles.keyHub, { borderColor: theme.colors.text }]}>
+                <Text style={{ fontSize: 8, fontWeight: '700', color: theme.colors.text }}>7</Text>
+              </View>
+              <Text style={[styles.keyText, { color: theme.colors.textMuted }]}>Hub (5+)</Text>
+            </View>
+            <View style={styles.keyItem}>
+              <View style={[styles.keyDot, { borderColor: theme.colors.text, borderStyle: 'dashed' }]} />
+              <Text style={[styles.keyText, { color: theme.colors.textMuted }]}>Needs a look</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Journeys — the readable detail, one card per team. */}
+        <View style={styles.journeysHead}>
+          <Text style={{ flex: 1, color: theme.colors.text, fontFamily: theme.fontFamilies.display.semibold, fontSize: theme.fontSizes.md }}>
+            {focusLineId ? 'Following' : 'Journeys'}
+          </Text>
+          {focusLineId ? (
+            <TouchableOpacity onPress={() => setFocusLineId(null)} hitSlop={8} accessibilityRole="button">
+              <Text style={{ color: theme.colors.accent, fontFamily: theme.fontFamilies.body.semibold, fontSize: 13 }}>Show all teams</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        {!focusLineId ? (
+          <TextField placeholder={TUBE_COPY.searchPlaceholder} leftIcon="search" value={search} onChangeText={setSearch} autoCapitalize="none" autoCorrect={false} />
+        ) : null}
+        {shownLines.length === 0 ? <EmptyState icon="search-off" title="No matches" description={TUBE_COPY.noMatches} /> : shownLines.map(renderLine)}
       </>
     );
   }
@@ -137,14 +224,64 @@ export function TeamTubeMap({ header, onOpenTeam }: TeamTubeMapProps) {
         {header}
         {content}
       </ScrollView>
+      {model ? (
+        <Modal visible={fullScreen} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setFullScreen(false)}>
+          <View style={{ flex: 1, backgroundColor: theme.colors.surface, paddingTop: insets.top, paddingBottom: insets.bottom }}>
+            <View style={styles.fsHeader}>
+              <Text style={{ flex: 1, color: theme.colors.text, fontFamily: theme.fontFamilies.display.semibold, fontSize: theme.fontSizes.lg }}>Metro map</Text>
+              <TouchableOpacity onPress={() => setFullScreen(false)} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close full screen">
+                <Icon name="close" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ flex: 1, paddingHorizontal: 8 }}>
+              <MetroMap
+                model={model}
+                focusLineId={focusLineId}
+                height={Math.max(300, winH - insets.top - insets.bottom - 120)}
+                onPressStation={(station) => setSelection({ kind: 'station', station })}
+                onPressLine={toggleFocus}
+              />
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.fsLegend}>
+              {model.lines.map((l) => {
+                const on = focusLineId === l.id;
+                const colour = colourOf(l.id);
+                return (
+                  <TouchableOpacity key={l.id} onPress={() => toggleFocus(l.id)} style={[styles.legendChip, { borderColor: on ? colour : theme.colors.border, backgroundColor: on ? colour + '1A' : theme.colors.surface, borderRadius: theme.radii.full }]}>
+                    <View style={[styles.legendSwatch, { backgroundColor: colour }]} />
+                    <Text style={{ color: theme.colors.text, fontSize: 12, fontFamily: on ? theme.fontFamilies.body.semibold : theme.fontFamilies.body.medium }}>{l.name}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+          {/* The stop/line sheet must open INSIDE this modal to show above it. */}
+          <TubeDetailSheet
+            selection={selection}
+            linesById={linesById}
+            stationsById={model.stations}
+            onClose={() => setSelection(null)}
+            onFollow={(lineId) => {
+              setFocusLineId(lineId);
+              setSelection(null);
+            }}
+            onOpenTeam={(id, name) => {
+              setSelection(null);
+              setFullScreen(false);
+              onOpenTeam(id, name);
+            }}
+          />
+        </Modal>
+      ) : null}
       <TubeDetailSheet
-        selection={selection}
+        selection={fullScreen ? null : selection}
         linesById={linesById}
         stationsById={model?.stations ?? new Map()}
         onClose={() => setSelection(null)}
         onFollow={(lineId) => {
-          const line = linesById.get(lineId);
-          setSelection(line ? { kind: 'line', line } : null);
+          /* Follow = highlight it on the map and show only its journey. */
+          setFocusLineId(lineId);
+          setSelection(null);
         }}
         onOpenTeam={(id, name) => {
           setSelection(null);
@@ -157,6 +294,22 @@ export function TeamTubeMap({ header, onOpenTeam }: TeamTubeMapProps) {
 
 const styles = StyleSheet.create({
   container: { padding: 16, gap: 12 },
+  mapCard: { borderWidth: StyleSheet.hairlineWidth, padding: 12, gap: 10 },
+  mapHead: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 2 },
+  fsBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
+  legendTitle: { fontSize: 10, letterSpacing: 0.6, marginTop: 2, paddingHorizontal: 2 },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  legendChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6, maxWidth: '100%' },
+  legendSwatch: { width: 14, height: 4, borderRadius: 2 },
+  key: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 10, paddingHorizontal: 2 },
+  keyItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  keyText: { fontSize: 11 },
+  keyDot: { width: 11, height: 11, borderRadius: 6, borderWidth: 2 },
+  keyPill: { width: 9, height: 16, borderRadius: 5, borderWidth: 2 },
+  keyHub: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  journeysHead: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
+  fsHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
+  fsLegend: { gap: 8, paddingHorizontal: 12, paddingVertical: 12 },
   card: { borderWidth: StyleSheet.hairlineWidth, padding: 14 },
   lineHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 },
   lineSwatch: { width: 6, height: 32, borderRadius: 3 },
